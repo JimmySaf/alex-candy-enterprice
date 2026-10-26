@@ -1,7 +1,5 @@
-
 import { useState } from "react";
 import {
-  ArrowRight,
   CheckCircle2,
   Clock3,
   LoaderCircle,
@@ -9,7 +7,6 @@ import {
   Search,
 } from "lucide-react";
 import { api } from "../lib/api";
-import type { CheckoutResponse } from "../types/product";
 import "./OrderTracking.css";
 
 interface TrackedOrderItem {
@@ -75,13 +72,10 @@ export default function OrderTracking() {
 
       setOrder(response.data);
     } catch (err: unknown) {
-      let message = "We couldn't find that order. Check your details and try again.";
+      let message =
+        "We couldn't find that order. Check your details and try again.";
 
-      if (
-        typeof err === "object" &&
-        err !== null &&
-        "response" in err
-      ) {
+      if (typeof err === "object" && err !== null && "response" in err) {
         const response = (
           err as {
             response?: {
@@ -101,9 +95,7 @@ export default function OrderTracking() {
     }
   }
 
-  const currentStep = order
-    ? statusSteps.indexOf(order.status)
-    : -1;
+  const currentStep = order ? statusSteps.indexOf(order.status) : -1;
 
   return (
     <section className="tracking-section" id="track">
@@ -111,10 +103,14 @@ export default function OrderTracking() {
         <span className="eyebrow">
           <Package size={15} /> YOUR ORDER, YOUR PEACE OF MIND
         </span>
-        <h2>Where's my order? <span>♡</span></h2>
+
+        <h2>
+          Where&apos;s my order? <span>♡</span>
+        </h2>
+
         <p>
-          Enter the order number and phone number you used at checkout
-          to see the latest status of your sweet order.
+          Enter the order number and phone number you used at checkout to see
+          the latest status of your sweet order.
         </p>
       </div>
 
@@ -143,7 +139,11 @@ export default function OrderTracking() {
             />
           </label>
 
-          <button className="primary-button tracking-submit" type="submit" disabled={loading}>
+          <button
+            className="primary-button tracking-submit"
+            type="submit"
+            disabled={loading}
+          >
             {loading ? (
               <>
                 <LoaderCircle className="spin" size={17} />
@@ -174,6 +174,7 @@ export default function OrderTracking() {
                   <Clock3 size={24} />
                 )}
               </div>
+
               <div>
                 <span className="tracking-overline">ORDER NUMBER</span>
                 <h3>{order.order_number}</h3>
@@ -187,7 +188,11 @@ export default function OrderTracking() {
               </div>
             </div>
 
-            <div className={`status-banner ${order.status === "cancelled" ? "status-cancelled" : ""}`}>
+            <div
+              className={`status-banner ${
+                order.status === "cancelled" ? "status-cancelled" : ""
+              }`}
+            >
               <span>Current status</span>
               <strong>
                 {statusLabels[order.status] ??
@@ -203,12 +208,19 @@ export default function OrderTracking() {
 
                   return (
                     <div
-                      className={`progress-step ${completed ? "is-complete" : ""}`}
+                      className={`progress-step ${
+                        completed ? "is-complete" : ""
+                      }`}
                       key={step}
                     >
                       <span className="progress-dot">
-                        {completed ? <CheckCircle2 size={17} /> : index + 1}
+                        {completed ? (
+                          <CheckCircle2 size={17} />
+                        ) : (
+                          index + 1
+                        )}
                       </span>
+
                       <span className="progress-label">
                         {statusLabels[step]}
                       </span>
@@ -219,7 +231,7 @@ export default function OrderTracking() {
             )}
 
             <div className="tracked-items-heading">
-              <h4>What's in your order?</h4>
+              <h4>What&apos;s in your order?</h4>
               <span>
                 {order.fulfillment_method === "delivery"
                   ? "🚚 Delivery"
@@ -239,6 +251,7 @@ export default function OrderTracking() {
                       {money(item.unit_price)} × {item.quantity}
                     </small>
                   </div>
+
                   <strong>{money(item.line_total)}</strong>
                 </div>
               ))}

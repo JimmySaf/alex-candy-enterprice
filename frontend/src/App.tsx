@@ -1,0 +1,899 @@
+
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  ArrowRight,
+  Candy,
+  CheckCircle2,
+  LoaderCircle,
+  MapPin,
+  Minus,
+  PackageCheck,
+  Plus,
+  Search,
+  ShoppingBag,
+  ShoppingCart,
+  Sparkles,
+  Trash2,
+  X,
+  MessageCircle,
+} from "lucide-react";
+import OrderTracking from "./components/OrderTracking";
+import { api } from "./lib/api";
+import { getProductImage, getProducts } from "./services/products";
+import type {
+  CartItem,
+  CheckoutResponse,
+  Product,
+  ProductCategory,
+} from "./types/product";
+import "./App.css";
+
+type CategoryFilter = "all" | ProductCategory;
+
+const categories: {
+  id: CategoryFilter;
+  label: string;
+  emoji: string;
+}[] = [
+  { id: "all", label: "All treats", emoji: "🍬" },
+  { id: "candy", label: "Candies", emoji: "🍭" },
+  { id: "yoghurt", label: "Yoghurt", emoji: "🥛" },
+  { id: "ice_pop", label: "Ice pops", emoji: "🍧" },
+];
+
+const money = (amount: string | number) =>
+  new Intl.NumberFormat("en-KE", {
+    style: "currency",
+    currency: "KES",
+    maximumFractionDigits: 2,
+  }).format(Number(amount));
+
+const whatsappNumber = (
+  import.meta.env.VITE_WHATSAPP_NUMBER as string | undefined
+)?.replace(/\D/g, "");
+
+function App() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [category, setCategory] = useState<CategoryFilter>("all");
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [cartOpen, setCartOpen] = useState(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [successOrder, setSuccessOrder] = useState<CheckoutResponse | null>(
+    null
+  );
+  const [whatsappOrderMessage, setWhatsappOrderMessage] = useState("");
+
+  const [customer, setCustomer] = useState({
+    customer_name: "",
+    customer_phone: "",
+    customer_email: "",
+    fulfillment_method: "collection" as "collection" | "delivery",
+    delivery_address: "",
+    customer_notes: "",
+  });
+
+  useEffect(() => {
+    async function loadProducts() {
+      try {
+        setLoading(true);
+        setError("");
+        const data = await getProducts();
+        setProducts(data.filter((product) => product.is_available));
+      } catch {
+        setError(
+          "We couldn't load the treats. Please make sure the Django backend is running."
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    void loadProducts();
+  }, []);
+
+  const filteredProducts = useMemo(() => {
+    const term = search.trim().toLowerCase();
+
+    return products.filter((product) => {
+      const matchesCategory =
+        category === "all" || product.category === category;
+
+      const matchesSearch =
+        !term ||
+        product.name.toLowerCase().includes(term) ||
+        product.description.toLowerCase().includes(term);
+
+      return matchesCategory && matchesSearch;
+    });
+  }, [products, category, search]);
+
+  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  const cartTotal = cart.reduce(
+    (sum, item) => sum + Number(item.product.price) * item.quantity,
+    0
+  );
+
+  function addToCart(product: Product) {
+    if (product.stock_quantity < 1) return;
+
+    setCart((current) => {
+      const existing = current.find(
+        (item) => item.product.id === product.id
+      );
+
+      if (existing) {
+        return current.map((item) =>
+          item.product.id === product.id
+            ? {
+                ...item,
+                quantity: Math.min(
+                  item.quantity + 1,
+                  product.stock_quantity
+                ),
+              }
+            : item
+        );
+      }
+
+      return [...current, { product, quantity: 1 }];
+    });
+  }
+
+  function updateQuantity(productId: number, change: number) {
+    setCart((current) =>
+      current
+        .map((item) => {
+          if (item.product.id !== productId) return item;
+
+          return {
+            ...item,
+            quantity: Math.min(
+              item.product.stock_quantity,
+              item.quantity + change
+            ),
+          };
+        })
+        .filter((item) => item.quantity > 0)
+    );
+  }
+
+  function removeFromCart(productId: number) {
+    setCart((current) =>
+      current.filter((item) => item.product.id !== productId)
+    );
+  }
+
+  function updateCustomer(
+    field: keyof typeof customer,
+    value: string
+  ) {
+    setCustomer((current) => ({ ...current, [field]: value }));
+  }
+
+  function openWhatsApp(message: string) {
+    if (!whatsappNumber) {
+      setError(
+        "WhatsApp is not configured yet. Add VITE_WHATSAPP_NUMBER to frontend/.env."
+      );
+      return;
+    }
+
+    const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  function contactOnWhatsApp() {
+    openWhatsApp(
+      "Hello ALEX CANDY ENTERPRICE! I'd like to ask about your treats."
+    );
+  }
+
+  async function submitOrder(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (cart.length === 0) {
+      setError("Add at least one treat to your cart first.");
+      return;
+    }
+
+    if (
+      customer.fulfillment_method === "delivery" &&
+      !customer.delivery_address.trim()
+    ) {
+      setError("Please enter your delivery address.");
+      return;
+    }
+
+    setSubmitting(true);
+    setError("");
+
+    try {
+      // Keep a snapshot before clearing the cart after successful checkout.
+      const orderedItems = cart.map((item) => ({
+        name: item.product.name,
+        quantity: item.quantity,
+        price: Number(item.product.price),
+        lineTotal: Number(item.product.price) * item.quantity,
+      }));
+
+      const orderTotal = cartTotal;
+
+      const response = await api.post<CheckoutResponse>("/orders/", {
+        ...customer,
+        items: cart.map((item) => ({
+          product_id: item.product.id,
+          quantity: item.quantity,
+        })),
+      });
+
+      const order = response.data;
+
+      const messageLines = [
+        "Hello ALEX CANDY ENTERPRICE! 🍬",
+        "",
+        "I'd like to follow up on my online order.",
+        `Order number: ${order.order_number}`,
+        "",
+        "ORDER SUMMARY",
+        ...orderedItems.map(
+          (item) =>
+            `• ${item.name} x ${item.quantity} — ${money(item.lineTotal)}`
+        ),
+        "",
+        `Order total: ${money(orderTotal)}`,
+        "",
+        "CUSTOMER DETAILS",
+        `Name: ${customer.customer_name}`,
+        `Phone: ${customer.customer_phone}`,
+        `Fulfilment: ${
+          customer.fulfillment_method === "delivery"
+            ? "Delivery"
+            : "Collection"
+        }`,
+        ...(customer.fulfillment_method === "delivery"
+          ? [`Delivery address: ${customer.delivery_address}`]
+          : []),
+        ...(customer.customer_email
+          ? [`Email: ${customer.customer_email}`]
+          : []),
+        ...(customer.customer_notes.trim()
+          ? [`Extra notes: ${customer.customer_notes.trim()}`]
+          : []),
+        "",
+        "Please confirm the order and any applicable delivery fee. Thank you!",
+      ];
+
+      setWhatsappOrderMessage(messageLines.join("\n"));
+      setSuccessOrder(order);
+      setCart([]);
+      setCheckoutOpen(false);
+      setCartOpen(false);
+
+      // Refresh the catalogue because checkout reduces product stock.
+      try {
+        const refreshedProducts = await getProducts();
+        setProducts(
+          refreshedProducts.filter((product) => product.is_available)
+        );
+      } catch {
+        // Checkout succeeded, so keep showing the order confirmation.
+      }
+    } catch (err: unknown) {
+      let message = "We couldn't place your order. Please try again.";
+
+      if (typeof err === "object" && err !== null && "response" in err) {
+        const response = (
+          err as {
+            response?: {
+              data?: {
+                detail?: string;
+                items?: string | string[];
+                delivery_address?: string | string[];
+                [key: string]: unknown;
+              };
+            };
+          }
+        ).response;
+
+        const data = response?.data;
+
+        if (data?.detail) {
+          message = data.detail;
+        } else if (data?.items) {
+          message = Array.isArray(data.items)
+            ? data.items.join(" ")
+            : data.items;
+        } else if (data?.delivery_address) {
+          message = Array.isArray(data.delivery_address)
+            ? data.delivery_address.join(" ")
+            : data.delivery_address;
+        } else if (data) {
+          const firstError = Object.values(data).find(
+            (value) =>
+              typeof value === "string" ||
+              (Array.isArray(value) &&
+                value.every((entry) => typeof entry === "string"))
+          );
+
+          if (typeof firstError === "string") {
+            message = firstError;
+          } else if (Array.isArray(firstError)) {
+            message = firstError.join(" ");
+          }
+        }
+      }
+
+      setError(message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="shop">
+      <div className="announcement">
+        <Sparkles size={15} />
+        <span>A little sweetness goes a long way!</span>
+        <Sparkles size={15} />
+      </div>
+
+      <header className="site-header">
+        <a className="brand" href="#home" aria-label="ALEX CANDY home">
+          <span className="brand-icon">
+            <Candy size={28} />
+          </span>
+          <span className="brand-copy">
+            <strong>ALEX CANDY</strong>
+            <small>ENTERPRICE · SWEETNESS FOR EVERYONE</small>
+          </span>
+        </a>
+
+        <nav className="desktop-nav" aria-label="Main navigation">
+          <a className="nav-active" href="#home">Home</a>
+          <a href="#treats">Our treats</a>
+          <a href="#track">Track order</a>
+          <a href="#about">About us</a>
+        </nav>
+
+        <div className="header-actions">
+          <button
+            className="icon-button cart-button"
+            onClick={() => setCartOpen(true)}
+            aria-label={`Open cart, ${cartCount} items`}
+          >
+            <ShoppingBag size={21} />
+            <span>Cart</span>
+            <b>{cartCount}</b>
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <section className="hero" id="home">
+          <div className="hero-copy">
+            <span className="eyebrow">
+              <Sparkles size={16} /> YOUR HAPPY PLACE FOR TREATS
+            </span>
+            <h1>
+              Life is better
+              <br />
+              with a little
+              <br />
+              <span>sweetness!</span>
+            </h1>
+            <p>
+              From colourful candies to creamy yoghurt and refreshing ice
+              pops, find a little happiness in every bite.
+            </p>
+            <div className="hero-actions">
+              <a className="primary-button" href="#treats">
+                Explore treats <ArrowRight size={18} />
+              </a>
+              <button className="text-button" onClick={contactOnWhatsApp}>
+                Talk to us
+              </button>
+            </div>
+            <div className="hero-note">
+              <span className="avatar-stack">
+                <i>🍭</i><i>🍦</i><i>🍬</i>
+              </span>
+              <span>
+                <strong>Made for happy moments</strong>
+                <small>Pick your favourites today</small>
+              </span>
+            </div>
+          </div>
+
+          <div className="hero-art" aria-label="Colourful sweet treats">
+            <div className="hero-orbit orbit-one" />
+            <div className="hero-orbit orbit-two" />
+            <div className="hero-sun">✦</div>
+            <span className="floating-sweet sweet-one">🍭</span>
+            <span className="floating-sweet sweet-two">🍬</span>
+            <span className="floating-sweet sweet-three">🍦</span>
+            <span className="floating-sweet sweet-four">🍧</span>
+            <div className="hero-sticker">
+              <span>100%</span>
+              <strong>HAPPY<br />VIBES</strong>
+            </div>
+            <div className="hero-caption">
+              <span>♡</span>
+              <div>
+                <strong>Sweeten your day</strong>
+                <small>One treat at a time</small>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="benefits" id="about">
+          <div className="benefit">
+            <span className="benefit-icon pink">🍬</span>
+            <div><strong>Sweet selection</strong><small>Treats for every craving</small></div>
+          </div>
+          <div className="benefit">
+            <span className="benefit-icon yellow">✨</span>
+            <div><strong>Happy moments</strong><small>Little joys, big smiles</small></div>
+          </div>
+          <div className="benefit">
+            <span className="benefit-icon green">🛍️</span>
+            <div><strong>Easy ordering</strong><small>Order online in a few clicks</small></div>
+          </div>
+          <div className="benefit">
+            <span className="benefit-icon purple">💗</span>
+            <div><strong>Your choice</strong><small>Delivery or collection</small></div>
+          </div>
+        </section>
+
+        <section className="products-section" id="treats">
+          <div className="section-heading">
+            <div>
+              <span className="eyebrow">A WORLD OF YUM</span>
+              <h2>Find your happy treat <span>♡</span></h2>
+              <p>What's making your taste buds smile today?</p>
+            </div>
+            <div className="search-box">
+              <Search size={18} />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search sweet treats..."
+                aria-label="Search products"
+              />
+              {search && (
+                <button onClick={() => setSearch("")} aria-label="Clear search">
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="category-row" aria-label="Filter products by category">
+            {categories.map((item) => (
+              <button
+                key={item.id}
+                className={`category-chip ${category === item.id ? "selected" : ""}`}
+                onClick={() => setCategory(item.id)}
+              >
+                <span>{item.emoji}</span> {item.label}
+              </button>
+            ))}
+          </div>
+
+          {error && !checkoutOpen && !cartOpen && !successOrder && (
+            <div className="notice error-notice" role="alert">
+              {error}
+              <button onClick={() => setError("")} aria-label="Dismiss message">
+                <X size={16} />
+              </button>
+            </div>
+          )}
+
+          {loading ? (
+            <div className="state-message">
+              <LoaderCircle className="spin" size={30} />
+              <p>Finding your favourite treats...</p>
+            </div>
+          ) : error && products.length === 0 ? (
+            <div className="state-message">
+              <span className="state-emoji">🍭</span>
+              <h3>Our sweet shelf is taking a break</h3>
+              <p>{error}</p>
+              <button
+                className="primary-button"
+                onClick={() => window.location.reload()}
+              >
+                Try again
+              </button>
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="state-message">
+              <span className="state-emoji">🍬</span>
+              <h3>No treats found just yet</h3>
+              <p>Try another search or choose a different category.</p>
+              <button
+                className="secondary-button"
+                onClick={() => {
+                  setSearch("");
+                  setCategory("all");
+                }}
+              >
+                Show all treats
+              </button>
+            </div>
+          ) : (
+            <div className="product-grid">
+              {filteredProducts.map((product, index) => {
+                const imageUrl = getProductImage(product.image);
+
+                return (
+                  <article
+                    className={`product-card product-card-${index % 4}`}
+                    key={product.id}
+                  >
+                    <div className="product-image">
+                      {imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt={product.name}
+                          loading="lazy"
+                          onError={(event) => {
+                            event.currentTarget.style.display = "none";
+                          }}
+                        />
+                      ) : (
+                        <span className="product-emoji">
+                          {product.category === "candy"
+                            ? "🍬"
+                            : product.category === "yoghurt"
+                              ? "🥛"
+                              : "🍧"}
+                        </span>
+                      )}
+                      <span className="product-category">
+                        {categories.find((item) => item.id === product.category)?.label}
+                      </span>
+                    </div>
+
+                    <div className="product-details">
+                      <h3>{product.name}</h3>
+                      <p>{product.description || "A little treat to brighten your day."}</p>
+                      <div className="product-bottom">
+                        <div>
+                          <strong className="product-price">{money(product.price)}</strong>
+                          <small>
+                            {product.stock_quantity > 0
+                              ? `${product.stock_quantity} available`
+                              : "Currently sold out"}
+                          </small>
+                        </div>
+                        <button
+                          className="add-button"
+                          onClick={() => addToCart(product)}
+                          disabled={product.stock_quantity < 1}
+                          aria-label={`Add ${product.name} to cart`}
+                        >
+                          <Plus size={20} />
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        <OrderTracking />
+
+        <section className="bottom-banner">
+          <div className="banner-emoji">🍭</div>
+          <div>
+            <span className="eyebrow">A LITTLE TREAT, A LOT OF JOY</span>
+            <h2>Ready to make today sweeter?</h2>
+            <p>Choose your favourites and place your order in minutes.</p>
+          </div>
+          <a className="banner-button" href="#treats">
+            Shop treats <ArrowRight size={18} />
+          </a>
+        </section>
+      </main>
+
+      <footer className="site-footer">
+        <a className="brand footer-brand" href="#home">
+          <span className="brand-icon"><Candy size={24} /></span>
+          <span className="brand-copy">
+            <strong>ALEX CANDY</strong>
+            <small>ENTERPRICE</small>
+          </span>
+        </a>
+        <p>Making everyday moments a little sweeter. 💗</p>
+        <span>© {new Date().getFullYear()} ALEX CANDY ENTERPRICE</span>
+      </footer>
+
+      {cartOpen && (
+        <div
+          className="overlay"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setCartOpen(false);
+          }}
+        >
+          <aside className="side-panel" aria-label="Shopping cart">
+            <div className="panel-heading">
+              <div>
+                <span className="eyebrow">YOUR SWEET PICKS</span>
+                <h2>Your cart ({cartCount})</h2>
+              </div>
+              <button className="close-button" onClick={() => setCartOpen(false)} aria-label="Close cart">
+                <X />
+              </button>
+            </div>
+
+            {cart.length === 0 ? (
+              <div className="empty-cart">
+                <span>🛍️</span>
+                <h3>Your cart is waiting for treats!</h3>
+                <p>Add some goodies and they'll appear here.</p>
+                <button className="primary-button" onClick={() => setCartOpen(false)}>
+                  Browse treats
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="cart-items">
+                  {cart.map((item) => (
+                    <div className="cart-item" key={item.product.id}>
+                      <div className="cart-item-emoji">
+                        {item.product.category === "candy"
+                          ? "🍬"
+                          : item.product.category === "yoghurt"
+                            ? "🥛"
+                            : "🍧"}
+                      </div>
+                      <div className="cart-item-info">
+                        <strong>{item.product.name}</strong>
+                        <span>{money(item.product.price)}</span>
+                        <div className="quantity-control">
+                          <button onClick={() => updateQuantity(item.product.id, -1)} aria-label="Decrease quantity">
+                            <Minus size={14} />
+                          </button>
+                          <span>{item.quantity}</span>
+                          <button
+                            onClick={() => updateQuantity(item.product.id, 1)}
+                            disabled={item.quantity >= item.product.stock_quantity}
+                            aria-label="Increase quantity"
+                          >
+                            <Plus size={14} />
+                          </button>
+                        </div>
+                      </div>
+                      <button className="remove-button" onClick={() => removeFromCart(item.product.id)} aria-label={`Remove ${item.product.name}`}>
+                        <Trash2 size={17} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="cart-summary">
+                  <div className="summary-line"><span>Subtotal</span><strong>{money(cartTotal)}</strong></div>
+                  <p>Delivery fees, if applicable, will be confirmed separately.</p>
+                  <button
+                    className="primary-button full-button"
+                    onClick={() => {
+                      setCartOpen(false);
+                      setCheckoutOpen(true);
+                      setError("");
+                    }}
+                  >
+                    Continue to checkout <ArrowRight size={18} />
+                  </button>
+                </div>
+              </>
+            )}
+          </aside>
+        </div>
+      )}
+
+      {checkoutOpen && (
+        <div
+          className="overlay"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !submitting) {
+              setCheckoutOpen(false);
+            }
+          }}
+        >
+          <section className="checkout-modal" aria-label="Checkout form">
+            <div className="panel-heading">
+              <div>
+                <span className="eyebrow">ALMOST THERE!</span>
+                <h2>Let's place your order</h2>
+                <p className="modal-subtitle">Tell us where to send your sweetness.</p>
+              </div>
+              <button className="close-button" disabled={submitting} onClick={() => setCheckoutOpen(false)} aria-label="Close checkout">
+                <X />
+              </button>
+            </div>
+
+            {error && (
+              <div className="notice error-notice" role="alert">
+                {error}
+                <button onClick={() => setError("")} aria-label="Dismiss message"><X size={16} /></button>
+              </div>
+            )}
+
+            <form className="checkout-form" onSubmit={submitOrder}>
+              <label>
+                Your full name
+                <input
+                  required
+                  minLength={2}
+                  maxLength={150}
+                  value={customer.customer_name}
+                  onChange={(event) => updateCustomer("customer_name", event.target.value)}
+                  placeholder="e.g. Alex Mwangi"
+                />
+              </label>
+
+              <label>
+                Phone number
+                <input
+                  required
+                  type="tel"
+                  maxLength={30}
+                  value={customer.customer_phone}
+                  onChange={(event) => updateCustomer("customer_phone", event.target.value)}
+                  placeholder="e.g. 0712 345 678"
+                />
+              </label>
+
+              <label>
+                Email address <span className="optional-label">Optional</span>
+                <input
+                  type="email"
+                  maxLength={254}
+                  value={customer.customer_email}
+                  onChange={(event) => updateCustomer("customer_email", event.target.value)}
+                  placeholder="you@example.com"
+                />
+              </label>
+
+              <fieldset className="fulfillment-options">
+                <legend>How would you like your order?</legend>
+                <label className={`fulfillment-option ${customer.fulfillment_method === "collection" ? "chosen" : ""}`}>
+                  <input
+                    type="radio"
+                    name="fulfillment"
+                    value="collection"
+                    checked={customer.fulfillment_method === "collection"}
+                    onChange={() => updateCustomer("fulfillment_method", "collection")}
+                  />
+                  <PackageCheck size={20} />
+                  <span><strong>Collection</strong><small>Pick it up yourself</small></span>
+                </label>
+                <label className={`fulfillment-option ${customer.fulfillment_method === "delivery" ? "chosen" : ""}`}>
+                  <input
+                    type="radio"
+                    name="fulfillment"
+                    value="delivery"
+                    checked={customer.fulfillment_method === "delivery"}
+                    onChange={() => updateCustomer("fulfillment_method", "delivery")}
+                  />
+                  <MapPin size={20} />
+                  <span><strong>Delivery</strong><small>Bring it to your address</small></span>
+                </label>
+              </fieldset>
+
+              {customer.fulfillment_method === "delivery" && (
+                <label>
+                  Delivery address
+                  <textarea
+                    required
+                    maxLength={2000}
+                    rows={3}
+                    value={customer.delivery_address}
+                    onChange={(event) => updateCustomer("delivery_address", event.target.value)}
+                    placeholder="Estate, street, building and nearby landmark"
+                  />
+                </label>
+              )}
+
+              <label>
+                Extra notes <span className="optional-label">Optional</span>
+                <textarea
+                  rows={2}
+                  maxLength={2000}
+                  value={customer.customer_notes}
+                  onChange={(event) => updateCustomer("customer_notes", event.target.value)}
+                  placeholder="Any special instructions?"
+                />
+              </label>
+
+              <div className="checkout-total">
+                <span>{cartCount} item{cartCount === 1 ? "" : "s"} · Order total</span>
+                <strong>{money(cartTotal)}</strong>
+              </div>
+
+              <button className="primary-button full-button" type="submit" disabled={submitting || cart.length === 0}>
+                {submitting ? (
+                  <><LoaderCircle className="spin" size={18} /> Placing order...</>
+                ) : (
+                  <>Place my order <ArrowRight size={18} /></>
+                )}
+              </button>
+              <p className="secure-note">Your order will be saved and sent to our shop for processing.</p>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {successOrder && (
+        <div className="overlay">
+          <section className="success-modal">
+            <div className="success-icon"><CheckCircle2 size={42} /></div>
+            <span className="eyebrow">ORDER RECEIVED!</span>
+            <h2>Thanks for your order! 💗</h2>
+            <p>Your order has been saved. Keep this number for reference.</p>
+
+            <div className="order-reference">
+              <span>YOUR ORDER NUMBER</span>
+              <strong>{successOrder.order_number}</strong>
+              <button
+                className="secondary-button"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(successOrder.order_number);
+                }}
+              >
+                Copy order number
+              </button>
+            </div>
+
+            <p className="success-total">
+              Order total: <strong>{money(successOrder.total)}</strong>
+            </p>
+
+            <button
+              className="primary-button full-button"
+              onClick={() => openWhatsApp(whatsappOrderMessage)}
+            >
+              <MessageCircle size={19} />
+              Send order summary on WhatsApp
+            </button>
+
+            {!whatsappNumber && (
+              <p className="secure-note">
+                Set VITE_WHATSAPP_NUMBER in frontend/.env to enable WhatsApp ordering.
+              </p>
+            )}
+
+            <button
+              className="secondary-button full-button"
+              onClick={() => {
+                setSuccessOrder(null);
+                setWhatsappOrderMessage("");
+                setError("");
+              }}
+            >
+              Back to sweet shopping <ArrowRight size={18} />
+            </button>
+          </section>
+        </div>
+      )}
+
+      <button
+        className="floating-cart"
+        onClick={() => setCartOpen(true)}
+        aria-label={`Open shopping cart with ${cartCount} items`}
+      >
+        <ShoppingCart size={22} />
+        <span>{cartCount}</span>
+      </button>
+    </div>
+  );
+}
+
+export default App;

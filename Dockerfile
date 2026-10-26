@@ -9,7 +9,6 @@ RUN npm ci
 
 COPY frontend/ ./
 
-# Render passes configured variables as Docker build arguments.
 ARG VITE_API_BASE_URL=/api
 ARG VITE_WHATSAPP_NUMBER
 
@@ -34,12 +33,10 @@ RUN python -m pip install --no-cache-dir \
 
 COPY backend/ /app/backend/
 
-# Copy the compiled React website into the location Django expects.
 COPY --from=frontend-build /app/frontend/dist/ /app/frontend/dist/
 
 WORKDIR /app/backend
 
-# Collect React and Django static assets into STATIC_ROOT.
 RUN SECRET_KEY=build-only-secret \
     DEBUG=False \
     ALLOWED_HOSTS=localhost \
@@ -47,5 +44,4 @@ RUN SECRET_KEY=build-only-secret \
 
 EXPOSE 10000
 
-# Run migrations before starting the web server.
-CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-10000}"]
+CMD ["sh", "-c", "python manage.py migrate --noinput && python ensure_production_admin.py && gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-10000}"]

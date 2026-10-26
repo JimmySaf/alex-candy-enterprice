@@ -2,21 +2,10 @@
 services:
   - type: web
     name: alexcandyenterprice
-    runtime: python
+    runtime: docker
     plan: free
-
-    buildCommand: >-
-      cd frontend &&
-      npm ci &&
-      npm run build &&
-      cd ../backend &&
-      pip install -r requirements.txt &&
-      python manage.py collectstatic --no-input
-
-    startCommand: >-
-      cd backend &&
-      python manage.py migrate --noinput &&
-      gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
 
     envVars:
       - key: SECRET_KEY

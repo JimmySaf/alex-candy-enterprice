@@ -1,6 +1,4 @@
-cd D:\ALEX-CANDY-ENTERPRICE
 
-@"
 # Python
 __pycache__/
 *.py[cod]
@@ -17,11 +15,13 @@ env/
 *.log
 db.sqlite3
 media/
+staticfiles/
 
-# Environment variables and secrets
+# Secrets and environment variables
 .env
 .env.*
 !.env.example
+!frontend/.env.example
 
 # Node.js
 node_modules/
@@ -33,4 +33,3 @@ dist/
 .idea/
 .DS_Store
 Thumbs.db
-"@ | Set-Content -Encoding utf8 .gitignore

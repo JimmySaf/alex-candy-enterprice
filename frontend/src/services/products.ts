@@ -16,27 +16,37 @@ export async function getProducts(): Promise<Product[]> {
 
   const data = response.data;
 
-  // Support both paginated and non-paginated Django responses.
   return Array.isArray(data) ? data : data.results;
 }
 
 export function getProductImage(
-  image: string | null | undefined
+  image: string | null | undefined,
 ): string | null {
   if (!image) {
     return null;
   }
 
-  // Keep absolute image URLs unchanged.
   if (/^https?:\/\//i.test(image)) {
     return image;
   }
 
-  // Use the Django backend origin for relative media paths.
-  const backendOrigin = "http://127.0.0.1:8000";
   const normalizedPath = image.startsWith("/")
     ? image
     : `/${image}`;
+
+  const apiBaseUrl = (
+    import.meta.env.VITE_API_BASE_URL as string | undefined
+  )?.trim() || "/api";
+
+  let backendOrigin = "";
+
+  if (/^https?:\/\//i.test(apiBaseUrl)) {
+    try {
+      backendOrigin = new URL(apiBaseUrl).origin;
+    } catch {
+      backendOrigin = "";
+    }
+  }
 
   return `${backendOrigin}${normalizedPath}`;
 }

@@ -72,6 +72,7 @@ function App() {
     null
   );
   const [whatsappOrderMessage, setWhatsappOrderMessage] = useState("");
+  const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
 
   const [customer, setCustomer] = useState({
     customer_name: "",
@@ -569,18 +570,22 @@ function App() {
                     key={product.id}
                   >
                     <div className="product-image">
-                      <span className="product-emoji" aria-hidden="true">
-                        {categoryEmoji(product.category)}
-                      </span>
-                      {imageUrl && (
+                      {imageUrl && !failedImages[product.id] ? (
                         <img
                           src={imageUrl}
                           alt={product.name}
                           loading="lazy"
-                          onError={(event) => {
-                            event.currentTarget.style.display = "none";
-                          }}
+                          onError={() =>
+                            setFailedImages((current) => ({
+                              ...current,
+                              [product.id]: true,
+                            }))
+                          }
                         />
+                      ) : (
+                        <span className="product-emoji" aria-hidden="true">
+                          {categoryEmoji(product.category)}
+                        </span>
                       )}
                       <span className="product-category">
                         {categories.find((item) => item.id === product.category)?.label}

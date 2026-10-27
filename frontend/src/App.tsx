@@ -1,4 +1,4 @@
-
+﻿
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   ArrowRight,
@@ -34,10 +34,10 @@ const categories: {
   label: string;
   emoji: string;
 }[] = [
-  { id: "all", label: "All treats", emoji: "🍬" },
-  { id: "candy", label: "Candies", emoji: "🍭" },
-  { id: "yoghurt", label: "Yoghurt", emoji: "🥛" },
-  { id: "ice_pop", label: "Ice pops", emoji: "🍧" },
+  { id: "all", label: "All treats", emoji: "ðŸ¬" },
+  { id: "candy", label: "Candies", emoji: "ðŸ­" },
+  { id: "yoghurt", label: "Yoghurt", emoji: "ðŸ¥›" },
+  { id: "ice_pop", label: "Ice pops", emoji: "ðŸ§" },
 ];
 
 const money = (amount: string | number) =>
@@ -248,7 +248,7 @@ function App() {
       const order = response.data;
 
       const messageLines = [
-        "Hello ALEX CANDY ENTERPRICE! 🍬",
+        "Hello ALEX CANDY ENTERPRICE! ðŸ¬",
         "",
         "I'd like to follow up on my online order.",
         `Order number: ${order.order_number}`,
@@ -256,7 +256,7 @@ function App() {
         "ORDER SUMMARY",
         ...orderedItems.map(
           (item) =>
-            `• ${item.name} x ${item.quantity} — ${money(item.lineTotal)}`
+            `â€¢ ${item.name} x ${item.quantity} â€” ${money(item.lineTotal)}`
         ),
         "",
         `Order total: ${money(orderTotal)}`,
@@ -363,7 +363,7 @@ function App() {
           </span>
           <span className="brand-copy">
             <strong>ALEX CANDY</strong>
-            <small>ENTERPRICE · SWEETNESS FOR EVERYONE</small>
+            <small>ENTERPRICE Â· SWEETNESS FOR EVERYONE</small>
           </span>
         </a>
 
@@ -414,7 +414,7 @@ function App() {
             </div>
             <div className="hero-note">
               <span className="avatar-stack">
-                <i>🍭</i><i>🍦</i><i>🍬</i>
+                <i>ðŸ­</i><i>ðŸ¦</i><i>ðŸ¬</i>
               </span>
               <span>
                 <strong>Made for happy moments</strong>
@@ -426,17 +426,17 @@ function App() {
           <div className="hero-art" aria-label="Colourful sweet treats">
             <div className="hero-orbit orbit-one" />
             <div className="hero-orbit orbit-two" />
-            <div className="hero-sun">✦</div>
-            <span className="floating-sweet sweet-one">🍭</span>
-            <span className="floating-sweet sweet-two">🍬</span>
-            <span className="floating-sweet sweet-three">🍦</span>
-            <span className="floating-sweet sweet-four">🍧</span>
+            <div className="hero-sun">âœ¦</div>
+            <span className="floating-sweet sweet-one">ðŸ­</span>
+            <span className="floating-sweet sweet-two">ðŸ¬</span>
+            <span className="floating-sweet sweet-three">ðŸ¦</span>
+            <span className="floating-sweet sweet-four">ðŸ§</span>
             <div className="hero-sticker">
               <span>100%</span>
               <strong>HAPPY<br />VIBES</strong>
             </div>
             <div className="hero-caption">
-              <span>♡</span>
+              <span>â™¡</span>
               <div>
                 <strong>Sweeten your day</strong>
                 <small>One treat at a time</small>
@@ -447,19 +447,19 @@ function App() {
 
         <section className="benefits" id="about">
           <div className="benefit">
-            <span className="benefit-icon pink">🍬</span>
+            <span className="benefit-icon pink">ðŸ¬</span>
             <div><strong>Sweet selection</strong><small>Treats for every craving</small></div>
           </div>
           <div className="benefit">
-            <span className="benefit-icon yellow">✨</span>
+            <span className="benefit-icon yellow">âœ¨</span>
             <div><strong>Happy moments</strong><small>Little joys, big smiles</small></div>
           </div>
           <div className="benefit">
-            <span className="benefit-icon green">🛍️</span>
+            <span className="benefit-icon green">ðŸ›ï¸</span>
             <div><strong>Easy ordering</strong><small>Order online in a few clicks</small></div>
           </div>
           <div className="benefit">
-            <span className="benefit-icon purple">💗</span>
+            <span className="benefit-icon purple">ðŸ’—</span>
             <div><strong>Your choice</strong><small>Delivery or collection</small></div>
           </div>
         </section>
@@ -468,7 +468,7 @@ function App() {
           <div className="section-heading">
             <div>
               <span className="eyebrow">A WORLD OF YUM</span>
-              <h2>Find your happy treat <span>♡</span></h2>
+              <h2>Find your happy treat <span>â™¡</span></h2>
               <p>What's making your taste buds smile today?</p>
             </div>
             <div className="search-box">
@@ -515,7 +515,7 @@ function App() {
             </div>
           ) : error && products.length === 0 ? (
             <div className="state-message">
-              <span className="state-emoji">🍭</span>
+              <span className="state-emoji">ðŸ­</span>
               <h3>Our sweet shelf is taking a break</h3>
               <p>{error}</p>
               <button
@@ -527,7 +527,7 @@ function App() {
             </div>
           ) : filteredProducts.length === 0 ? (
             <div className="state-message">
-              <span className="state-emoji">🍬</span>
+              <span className="state-emoji">ðŸ¬</span>
               <h3>No treats found just yet</h3>
               <p>Try another search or choose a different category.</p>
               <button
@@ -543,7 +543,18 @@ function App() {
           ) : (
             <div className="product-grid">
               {filteredProducts.map((product, index) => {
-                const imageUrl = getProductImage(product.image);
+                const productName = product.name.trim().toLowerCase();
+                const imageUrl =
+                  product.category === "ice_pop"
+                    ? "/products/icepop.jpeg"
+                    : product.category === "yoghurt"
+                      ? "/products/youghurt.jpeg"
+                      : productName.includes("chocolate") ||
+                          productName.includes("duos")
+                        ? "/products/chocolate.jpeg"
+                        : product.category === "candy"
+                          ? "/products/sweets.jpeg"
+                          : getProductImage(product.image);
 
                 return (
                   <article
@@ -553,10 +564,10 @@ function App() {
                     <div className="product-image">
                       <span className="product-emoji" aria-hidden="true">
                         {product.category === "candy"
-                          ? "🍬"
+                          ? "ðŸ¬"
                           : product.category === "yoghurt"
-                            ? "🥛"
-                            : "🍧"}
+                            ? "ðŸ¥›"
+                            : "ðŸ§"}
                       </span>
                       {imageUrl && (
                         <img
@@ -613,7 +624,7 @@ function App() {
         <OrderTracking />
 
         <section className="bottom-banner">
-          <div className="banner-emoji">🍭</div>
+          <div className="banner-emoji">ðŸ­</div>
           <div>
             <span className="eyebrow">A LITTLE TREAT, A LOT OF JOY</span>
             <h2>Ready to make today sweeter?</h2>
@@ -635,8 +646,8 @@ function App() {
             <small>ENTERPRICE</small>
           </span>
         </a>
-        <p>Making everyday moments a little sweeter. 💗</p>
-        <span>© {new Date().getFullYear()} ALEX CANDY ENTERPRICE</span>
+        <p>Making everyday moments a little sweeter. ðŸ’—</p>
+        <span>Â© {new Date().getFullYear()} ALEX CANDY ENTERPRICE</span>
       </footer>
 
       {cartOpen && (
@@ -659,7 +670,7 @@ function App() {
 
             {cart.length === 0 ? (
               <div className="empty-cart">
-                <span>🛍️</span>
+                <span>ðŸ›ï¸</span>
                 <h3>Your cart is waiting for treats!</h3>
                 <p>Add some goodies and they'll appear here.</p>
                 <button className="primary-button" onClick={() => setCartOpen(false)}>
@@ -673,10 +684,10 @@ function App() {
                     <div className="cart-item" key={item.product.id}>
                       <div className="cart-item-emoji">
                         {item.product.category === "candy"
-                          ? "🍬"
+                          ? "ðŸ¬"
                           : item.product.category === "yoghurt"
-                            ? "🥛"
-                            : "🍧"}
+                            ? "ðŸ¥›"
+                            : "ðŸ§"}
                       </div>
                       <div className="cart-item-info">
                         <strong>{item.product.name}</strong>
@@ -837,7 +848,7 @@ function App() {
               </label>
 
               <div className="checkout-total">
-                <span>{cartCount} item{cartCount === 1 ? "" : "s"} · Order total</span>
+                <span>{cartCount} item{cartCount === 1 ? "" : "s"} Â· Order total</span>
                 <strong>{money(cartTotal)}</strong>
               </div>
 
@@ -859,7 +870,7 @@ function App() {
           <section className="success-modal">
             <div className="success-icon"><CheckCircle2 size={42} /></div>
             <span className="eyebrow">ORDER RECEIVED!</span>
-            <h2>Thanks for your order! 💗</h2>
+            <h2>Thanks for your order! ðŸ’—</h2>
             <p>Your order has been saved. Keep this number for reference.</p>
 
             <div className="order-reference">
@@ -920,3 +931,4 @@ function App() {
 }
 
 export default App;
+

@@ -1,52 +1,78 @@
 
-import { api } from "../lib/api";
 import type { Product } from "../types/product";
 
-interface PaginatedResponse<T> {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: T[];
-}
+const API_BASE_URL =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || "/api";
 
 export async function getProducts(): Promise<Product[]> {
-  const response = await api.get<
-    Product[] | PaginatedResponse<Product>
-  >("/products/");
+  const response = await fetch(`${API_BASE_URL}/products/`);
 
-  const data = response.data;
+  if (!response.ok) {
+    throw new Error(`Failed to load products: ${response.status}`);
+  }
 
-  return Array.isArray(data) ? data : data.results;
+  const data: unknown = await response.json();
+
+  // Support APIs that return either a plain array or paginated results.
+  if (Array.isArray(data)) {
+    return data as Product[];
+  }
+
+  if (
+    typeof data === "object" &&
+    data !== null &&
+    "results" in data &&
+    Array.isArray(data.results)
+  ) {
+    return data.results as Product[];
+  }
+
+  throw new Error("The products API returned an unexpected response.");
 }
 
 export function getProductImage(
   image: string | null | undefined,
 ): string | null {
-  if (!image) {
+  const value = image?.trim();
+
+  if (!value) {
     return null;
   }
 
-  if (/^https?:\/\//i.test(image)) {
-    return image;
-  }
-
-  const normalizedPath = image.startsWith("/")
-    ? image
-    : `/${image}`;
-
-  const apiBaseUrl = (
-    import.meta.env.VITE_API_BASE_URL as string | undefined
-  )?.trim() || "/api";
-
-  let backendOrigin = "";
-
-  if (/^https?:\/\//i.test(apiBaseUrl)) {
+  // Keep valid absolute URLs, except localhost URLs from local development.
+  if (/^https?:\/\//i.test(value)) {
     try {
-      backendOrigin = new URL(apiBaseUrl).origin;
+      const parsed = new URL(value);
+
+      if (
+        parsed.hostname === "localhost" ||
+        parsed.hostname === "127.0.0.1" ||
+        parsed.hostname === "0.0.0.0"
+      ) {
+        return `${window.location.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
+      }
+
+      return value;
     } catch {
-      backendOrigin = "";
+      return value;
     }
   }
 
-  return `${backendOrigin}${normalizedPath}`;
+  // Resolve protocol-relative image URLs.
+  if (value.startsWith("//")) {
+    return `${window.location.protocol}${value}`;
+  }
+
+  const normalizedPath = value.startsWith("/") ? value : `/${value}`;
+
+  // If the API is on a separate server, load media from that server.
+  if (/^https?:\/\//i.test(API_BASE_URL)) {
+    try {
+      return `${new URL(API_BASE_URL).origin}${normalizedPath}`;
+    } catch {
+      // Fall back to the current website.
+    }
+  }
+
+  return normalizedPath;
 }

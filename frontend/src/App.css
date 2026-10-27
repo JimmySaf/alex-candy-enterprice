@@ -1816,3 +1816,77 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Brand logo image */
+.brand-logo-frame {
+  overflow: hidden;
+  transform: none;
+  padding: 3px;
+  background: #fff;
+  border: 1px solid #f3dce8;
+}
+
+.brand-logo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 11px;
+  object-fit: contain;
+}
+
+/* Product image fallback remains visible if the server image cannot load. */
+.product-image .product-emoji {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.product-image img {
+  position: relative;
+  z-index: 1;
+}
+
+.product-category {
+  z-index: 2;
+}
+
+/* Small direct-order button shown on every product card. */
+.product-whatsapp-button {
+  display: flex;
+  width: 100%;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 13px;
+  padding: 8px 10px;
+  border: 1px solid #cbe8d3;
+  border-radius: 10px;
+  background: #f0fff4;
+  color: #197344;
+  font-size: 10px;
+  font-weight: 800;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.product-whatsapp-button:hover:not(:disabled) {
+  border-color: #8fd2a4;
+  background: #dcfce7;
+  transform: translateY(-1px);
+}
+
+.product-whatsapp-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@media (max-width: 700px) {
+  .product-whatsapp-button {
+    min-height: 34px;
+    gap: 5px;
+    margin-top: 11px;
+    padding: 7px 5px;
+    font-size: 9px;
+  }
+}

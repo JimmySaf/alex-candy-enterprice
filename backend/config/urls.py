@@ -20,10 +20,23 @@ def frontend_index(request):
     )
 
 
+def frontend_logo(request):
+    logo_file = settings.FRONTEND_DIST_DIR / "logo.jpeg"
+
+    if not logo_file.is_file():
+        return HttpResponseNotFound("Logo image not found.")
+
+    return FileResponse(
+        logo_file.open("rb"),
+        content_type="image/jpeg",
+    )
+
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("products.urls")),
     path("api/", include("orders.urls")),
+    path("logo.jpeg", frontend_logo, name="frontend-logo"),
     path("", frontend_index, name="frontend"),
     re_path(
         r"^(?!api/|admin/|static/|media/).+",

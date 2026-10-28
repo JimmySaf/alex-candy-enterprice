@@ -34,7 +34,7 @@ const categories: {
   label: string;
   emoji: string;
 }[] = [
-  { id: "all", label: "All treats", emoji: "\u{1F36C}" },
+  { id: "all", label: "All products", emoji: "\u{1F36C}" },
   { id: "candy", label: "Candies", emoji: "\u{1F36D}" },
   { id: "yoghurt", label: "Yoghurt", emoji: "\u{1F95B}" },
   { id: "ice_pop", label: "Ice pops", emoji: "\u{1F367}" },
@@ -120,7 +120,7 @@ function App() {
         setProducts(data.filter((product) => product.is_available));
       } catch {
         setError(
-          "We couldn't load the treats. Please make sure the Django backend is running."
+          "We couldn't load the products. Please make sure the Django backend is running."
         );
       } finally {
         setLoading(false);
@@ -221,7 +221,7 @@ function App() {
 
   function contactOnWhatsApp() {
     openWhatsApp(
-      "Hello ALEX CANDY ENTERPRICE! I'd like to ask about your treats."
+      "Hello ALEX CANDY ENTERPRICE! I'd like to ask about your products."
     );
   }
 
@@ -400,7 +400,7 @@ function App() {
 
         <nav className="desktop-nav" aria-label="Main navigation">
           <a className="nav-active" href="#home">Home</a>
-          <a href="#treats">Our treats</a>
+          <a href="#products">Our products</a>
           <a href="#track">Track order</a>
           <a href="#about">About us</a>
         </nav>
@@ -422,7 +422,7 @@ function App() {
         <section className="hero" id="home">
           <div className="hero-copy">
             <span className="eyebrow">
-              <Sparkles size={16} /> YOUR HAPPY PLACE FOR TREATS
+              <Sparkles size={16} /> YOUR HAPPY PLACE FOR products
             </span>
             <h1>
               Life is better
@@ -436,8 +436,8 @@ function App() {
               pops, find a little happiness in every bite.
             </p>
             <div className="hero-actions">
-              <a className="primary-button" href="#treats">
-                Explore treats <ArrowRight size={18} />
+              <a className="primary-button" href="#products">
+                Explore Products <ArrowRight size={18} />
               </a>
               <button className="text-button" onClick={contactOnWhatsApp}>
                 Talk to us
@@ -454,7 +454,7 @@ function App() {
             </div>
           </div>
 
-          <div className="hero-art" aria-label="Colourful sweet treats">
+          <div className="hero-art" aria-label="Colourful sweet products">
             <div className="hero-orbit orbit-one" />
             <div className="hero-orbit orbit-two" />
             <div className="hero-sun">{"\u2726"}</div>
@@ -479,7 +479,7 @@ function App() {
         <section className="benefits" id="about">
           <div className="benefit">
             <span className="benefit-icon pink">{"\u{1F36C}"}</span>
-            <div><strong>Sweet selection</strong><small>Treats for every craving</small></div>
+            <div><strong>Sweet selection</strong><small>products for every craving</small></div>
           </div>
           <div className="benefit">
             <span className="benefit-icon yellow">{"\u2728"}</span>
@@ -495,7 +495,7 @@ function App() {
           </div>
         </section>
 
-        <section className="products-section" id="treats">
+        <section className="products-section" id="products">
           <div className="section-heading">
             <div>
               <span className="eyebrow">A WORLD OF YUM</span>
@@ -507,7 +507,7 @@ function App() {
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search sweet treats..."
+                placeholder="Search sweet products..."
                 aria-label="Search products"
               />
               {search && (
@@ -542,7 +542,7 @@ function App() {
           {loading ? (
             <div className="state-message">
               <LoaderCircle className="spin" size={30} />
-              <p>Finding your favourite treats...</p>
+              <p>Finding your favourite products...</p>
             </div>
           ) : error && products.length === 0 ? (
             <div className="state-message">
@@ -559,7 +559,7 @@ function App() {
           ) : filteredProducts.length === 0 ? (
             <div className="state-message">
               <span className="state-emoji">{"\u{1F36C}"}</span>
-              <h3>No treats found just yet</h3>
+              <h3>No products found just yet</h3>
               <p>Try another search or choose a different category.</p>
               <button
                 className="secondary-button"
@@ -568,7 +568,7 @@ function App() {
                   setCategory("all");
                 }}
               >
-                Show all treats
+                Show all products
               </button>
             </div>
           ) : (
@@ -650,8 +650,8 @@ function App() {
             <h2>Ready to make today sweeter?</h2>
             <p>Choose your favourites and place your order in minutes.</p>
           </div>
-          <a className="banner-button" href="#treats">
-            Shop treats <ArrowRight size={18} />
+          <a className="banner-button" href="#products">
+            Shop products <ArrowRight size={18} />
           </a>
         </section>
       </main>
@@ -691,10 +691,10 @@ function App() {
             {cart.length === 0 ? (
               <div className="empty-cart">
                 <span>{"\u{1F6CD}\uFE0F"}</span>
-                <h3>Your cart is waiting for treats!</h3>
+                <h3>Your cart is waiting for products!</h3>
                 <p>Add some goodies and they'll appear here.</p>
                 <button className="primary-button" onClick={() => setCartOpen(false)}>
-                  Browse treats
+                  Browse products
                 </button>
               </div>
             ) : (

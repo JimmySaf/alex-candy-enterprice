@@ -1,3 +1,4 @@
+
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   ArrowRight,
@@ -33,19 +34,45 @@ const categories: {
   label: string;
   emoji: string;
 }[] = [
-  { id: "all", label: "All treats", emoji: "\u{1F36C}" }, // candy
-  { id: "candy", label: "Candies", emoji: "\u{1F36D}" }, // lollipop
-  { id: "yoghurt", label: "Yoghurt", emoji: "\u{1F95B}" }, // glass of milk
-  { id: "ice_pop", label: "Ice pops", emoji: "\u{1F367}" }, // shaved ice
+  { id: "all", label: "All treats", emoji: "\u{1F36C}" },
+  { id: "candy", label: "Candies", emoji: "\u{1F36D}" },
+  { id: "yoghurt", label: "Yoghurt", emoji: "\u{1F95B}" },
+  { id: "ice_pop", label: "Ice pops", emoji: "\u{1F367}" },
 ];
 
-// One place for the per-category emoji (used on product cards and in the cart).
 const categoryEmoji = (productCategory: ProductCategory) =>
   productCategory === "candy"
-    ? "\u{1F36C}" // candy
+    ? "\u{1F36C}"
     : productCategory === "yoghurt"
-      ? "\u{1F95B}" // glass of milk
-      : "\u{1F367}"; // shaved ice
+      ? "\u{1F95B}"
+      : "\u{1F367}";
+
+// Always prefer your local images for known product categories.
+function getLocalProductImage(product: Product): string | null {
+  const productName = product.name.trim().toLowerCase();
+
+  if (product.category === "ice_pop") {
+    return "/products/icepop.jpeg";
+  }
+
+  if (product.category === "yoghurt") {
+    return "/products/youghurt.jpeg";
+  }
+
+  if (
+    productName.includes("chocolate") ||
+    productName.includes("duos")
+  ) {
+    return "/products/chocolate.jpeg";
+  }
+
+  if (product.category === "candy") {
+    return "/products/sweets.jpeg";
+  }
+
+  // For any other product, use its Django image if available.
+  return getProductImage(product.image) || null;
+}
 
 const money = (amount: string | number) =>
   new Intl.NumberFormat("en-KE", {
@@ -68,11 +95,12 @@ function App() {
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [successOrder, setSuccessOrder] = useState<CheckoutResponse | null>(
-    null
-  );
+  const [successOrder, setSuccessOrder] =
+    useState<CheckoutResponse | null>(null);
   const [whatsappOrderMessage, setWhatsappOrderMessage] = useState("");
-  const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
+  const [failedImages, setFailedImages] = useState<Record<number, boolean>>(
+    {}
+  );
 
   const [customer, setCustomer] = useState({
     customer_name: "",
@@ -175,10 +203,7 @@ function App() {
     );
   }
 
-  function updateCustomer(
-    field: keyof typeof customer,
-    value: string
-  ) {
+  function updateCustomer(field: keyof typeof customer, value: string) {
     setCustomer((current) => ({ ...current, [field]: value }));
   }
 
@@ -235,7 +260,6 @@ function App() {
     setError("");
 
     try {
-      // Keep a snapshot before clearing the cart after successful checkout.
       const orderedItems = cart.map((item) => ({
         name: item.product.name,
         quantity: item.quantity,
@@ -296,14 +320,13 @@ function App() {
       setCheckoutOpen(false);
       setCartOpen(false);
 
-      // Refresh the catalogue because checkout reduces product stock.
       try {
         const refreshedProducts = await getProducts();
         setProducts(
           refreshedProducts.filter((product) => product.is_available)
         );
       } catch {
-        // Checkout succeeded, so keep showing the order confirmation.
+        // Keep the order confirmation visible if refreshing fails.
       }
     } catch (err: unknown) {
       let message = "We couldn't place your order. Please try again.";
@@ -551,18 +574,7 @@ function App() {
           ) : (
             <div className="product-grid">
               {filteredProducts.map((product, index) => {
-                const productName = product.name.trim().toLowerCase();
-                const imageUrl =
-                  product.category === "ice_pop"
-                    ? "/products/icepop.jpeg"
-                    : product.category === "yoghurt"
-                      ? "/products/youghurt.jpeg"
-                      : productName.includes("chocolate") ||
-                          productName.includes("duos")
-                        ? "/products/chocolate.jpeg"
-                        : product.category === "candy"
-                          ? "/products/sweets.jpeg"
-                          : getProductImage(product.image);
+                const imageUrl = getLocalProductImage(product);
 
                 return (
                   <article

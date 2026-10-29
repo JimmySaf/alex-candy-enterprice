@@ -1,10 +1,19 @@
-
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import {
   ArrowRight,
+  Check,
   CheckCircle2,
+  Copy,
   LoaderCircle,
   MapPin,
+  MessageCircle,
   Minus,
   PackageCheck,
   Plus,
@@ -14,7 +23,6 @@ import {
   Sparkles,
   Trash2,
   X,
-  MessageCircle,
 } from "lucide-react";
 import OrderTracking from "./components/OrderTracking";
 import { api } from "./lib/api";
@@ -27,17 +35,29 @@ import type {
 } from "./types/product";
 import "./App.css";
 
-type CategoryFilter = "all" | ProductCategory;
+/* ------------------------------------------------------------------ */
+/* Constants & helpers                                                 */
+/* ------------------------------------------------------------------ */
 
-const categories: {
-  id: CategoryFilter;
-  label: string;
-  emoji: string;
-}[] = [
+const BUSINESS_NAME = "ALEX CANDY ENTERPRICE"; // change spelling here once
+const CART_STORAGE_KEY = "alex-candy-cart-v1";
+const LOW_STOCK_THRESHOLD = 5;
+
+type CategoryFilter = "all" | ProductCategory;
+type SortOption = "featured" | "price_asc" | "price_desc" | "name";
+
+const categories: { id: CategoryFilter; label: string; emoji: string }[] = [
   { id: "all", label: "All products", emoji: "\u{1F36C}" },
   { id: "candy", label: "Candies", emoji: "\u{1F36D}" },
   { id: "yoghurt", label: "Yoghurt", emoji: "\u{1F95B}" },
   { id: "ice_pop", label: "Ice pops", emoji: "\u{1F367}" },
+];
+
+const sortOptions: { id: SortOption; label: string }[] = [
+  { id: "featured", label: "Featured" },
+  { id: "price_asc", label: "Price: low to high" },
+  { id: "price_desc", label: "Price: high to low" },
+  { id: "name", label: "Name: A to Z" },
 ];
 
 const categoryEmoji = (productCategory: ProductCategory) =>
@@ -51,188 +71,360 @@ const categoryEmoji = (productCategory: ProductCategory) =>
 function getLocalProductImage(product: Product): string | null {
   const productName = product.name.trim().toLowerCase();
 
-  if (product.category === "ice_pop") {
-    return "/products/icepop.jpeg";
-  }
+  if (product.category === "ice_pop") return "/products/icepop.jpeg";
+  if (product.category === "yoghurt") return "/products/youghurt.jpeg";
 
-  if (product.category === "yoghurt") {
-    return "/products/youghurt.jpeg";
-  }
-
-  if (
-    productName.includes("chocolate") ||
-    productName.includes("duos")
-  ) {
+  if (productName.includes("chocolate") || productName.includes("duos")) {
     return "/products/chocolate.jpeg";
   }
 
-  if (product.category === "candy") {
-    return "/products/sweets.jpeg";
-  }
+  if (product.category === "candy") return "/products/sweets.jpeg";
 
-  // For any other product, use its Django image if available.
   return getProductImage(product.image) || null;
 }
 
-const money = (amount: string | number) =>
-  new Intl.NumberFormat("en-KE", {
-    style: "currency",
-    currency: "KES",
-    maximumFractionDigits: 2,
-  }).format(Number(amount));
+const moneyFormatter = new Intl.NumberFormat("en-KE", {
+  style: "currency",
+  currency: "KES",
+  maximumFractionDigits: 2,
+});
+const money = (amount: string | number) => moneyFormatter.format(Number(amount));
 
 const whatsappNumber = (
   import.meta.env.VITE_WHATSAPP_NUMBER as string | undefined
 )?.replace(/\D/g, "");
 
+// Accepts 07xx, 01xx, 7xx, 1xx, 254..., +254... (spaces and dashes ignored)
+const KENYA_PHONE = /^(?:\+?254|0)?[17]\d{8}$/;
+const isValidPhone = (value: string) =>
+  KENYA_PHONE.test(value.replace(/[\s-]/g, ""));
+
+function readStoredCart(): CartItem[] {
+  try {
+    const raw = localStorage.getItem(CART_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (item): item is CartItem =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof (item as CartItem).quantity === "number" &&
+        typeof (item as CartItem).product?.id === "number"
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** Turns any API/Axios error into a friendly message. */
+function getErrorMessage(err: unknown): string {
+  const fallback = "We couldn't place your order. Please try again.";
+
+  if (typeof err !== "object" || err === null) return fallback;
+
+  if (!("response" in err)) {
+    return "We couldn't reach the shop. Check your internet connection and try again.";
+  }
+
+  const data = (err as { response?: { data?: unknown } }).response?.data;
+  if (!data || typeof data !== "object") return fallback;
+
+  const record = data as Record<string, unknown>;
+  const toText = (value: unknown): string | null => {
+    if (typeof value === "string") return value;
+    if (Array.isArray(value) && value.every((v) => typeof v === "string")) {
+      return value.join(" ");
+    }
+    return null;
+  };
+
+  const preferred = ["detail", "items", "delivery_address", "customer_phone"];
+  for (const key of preferred) {
+    const text = toText(record[key]);
+    if (text) return text;
+  }
+
+  for (const value of Object.values(record)) {
+    const text = toText(value);
+    if (text) return text;
+  }
+
+  return fallback;
+}
+
+type CustomerForm = {
+  customer_name: string;
+  customer_phone: string;
+  customer_email: string;
+  fulfillment_method: "collection" | "delivery";
+  delivery_address: string;
+  customer_notes: string;
+};
+
+const emptyCustomer: CustomerForm = {
+  customer_name: "",
+  customer_phone: "",
+  customer_email: "",
+  fulfillment_method: "collection",
+  delivery_address: "",
+  customer_notes: "",
+};
+
+/* ------------------------------------------------------------------ */
+/* Component                                                           */
+/* ------------------------------------------------------------------ */
+
 function App() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>(readStoredCart);
   const [category, setCategory] = useState<CategoryFilter>("all");
+  const [sort, setSort] = useState<SortOption>("featured");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [formError, setFormError] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [successOrder, setSuccessOrder] =
-    useState<CheckoutResponse | null>(null);
+  const [successOrder, setSuccessOrder] = useState<CheckoutResponse | null>(null);
   const [whatsappOrderMessage, setWhatsappOrderMessage] = useState("");
-  const [failedImages, setFailedImages] = useState<Record<number, boolean>>(
-    {}
-  );
+  const [whatsappNotice, setWhatsappNotice] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [toast, setToast] = useState("");
+  const [activeSection, setActiveSection] = useState("home");
+  const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
+  const [customer, setCustomer] = useState<CustomerForm>(emptyCustomer);
 
-  const [customer, setCustomer] = useState({
-    customer_name: "",
-    customer_phone: "",
-    customer_email: "",
-    fulfillment_method: "collection" as "collection" | "delivery",
-    delivery_address: "",
-    customer_notes: "",
-  });
+  const toastTimer = useRef<number | undefined>(undefined);
 
-  useEffect(() => {
-    async function loadProducts() {
-      try {
-        setLoading(true);
-        setError("");
-        const data = await getProducts();
-        setProducts(data.filter((product) => product.is_available));
-      } catch {
-        setError(
-          "We couldn't load the products. Please make sure the Django backend is running."
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    void loadProducts();
+  /* ----- toast ----- */
+  const showToast = useCallback((message: string) => {
+    setToast(message);
+    window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(""), 2200);
   }, []);
 
+  useEffect(() => () => window.clearTimeout(toastTimer.current), []);
+
+  /* ----- load products (and reconcile cart with fresh stock/prices) ----- */
+  const loadProducts = useCallback(async () => {
+    try {
+      setLoading(true);
+      setLoadError("");
+      const data = await getProducts();
+      const available = data.filter((product) => product.is_available);
+      setProducts(available);
+
+      setCart((current) =>
+        current
+          .map((item) => {
+            const fresh = available.find((p) => p.id === item.product.id);
+            if (!fresh || fresh.stock_quantity < 1) return null;
+            return {
+              product: fresh,
+              quantity: Math.min(item.quantity, fresh.stock_quantity),
+            };
+          })
+          .filter((item): item is CartItem => item !== null)
+      );
+    } catch {
+      setLoadError(
+        "We couldn't load the products. Please check your connection and try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadProducts();
+  }, [loadProducts]);
+
+  /* ----- persist cart ----- */
+  useEffect(() => {
+    try {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+    } catch {
+      // Storage can be unavailable (private mode) - the cart still works.
+    }
+  }, [cart]);
+
+  /* ----- debounce search ----- */
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebouncedSearch(search), 200);
+    return () => window.clearTimeout(id);
+  }, [search]);
+
+  /* ----- Escape key + body scroll lock for overlays ----- */
+  const anyOverlayOpen = cartOpen || checkoutOpen || !!successOrder;
+
+  useEffect(() => {
+    if (!anyOverlayOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      if (checkoutOpen && !submitting) setCheckoutOpen(false);
+      else if (cartOpen) setCartOpen(false);
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [anyOverlayOpen, cartOpen, checkoutOpen, submitting]);
+
+  /* ----- highlight current nav link while scrolling ----- */
+  useEffect(() => {
+    const ids = ["home", "products", "track", "about"];
+    const elements = ids
+      .map((id) => document.getElementById(id))
+      .filter((el): el is HTMLElement => el !== null);
+
+    if (elements.length === 0 || !("IntersectionObserver" in window)) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (visible) setActiveSection(visible.target.id);
+      },
+      { rootMargin: "-30% 0px -50% 0px", threshold: [0, 0.25, 0.5, 1] }
+    );
+
+    elements.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [loading]);
+
+  /* ----- derived data ----- */
   const filteredProducts = useMemo(() => {
-    const term = search.trim().toLowerCase();
+    const term = debouncedSearch.trim().toLowerCase();
 
-    return products.filter((product) => {
-      const matchesCategory =
-        category === "all" || product.category === category;
-
+    const list = products.filter((product) => {
+      const matchesCategory = category === "all" || product.category === category;
       const matchesSearch =
         !term ||
         product.name.toLowerCase().includes(term) ||
-        product.description.toLowerCase().includes(term);
-
+        (product.description ?? "").toLowerCase().includes(term);
       return matchesCategory && matchesSearch;
     });
-  }, [products, category, search]);
+
+    switch (sort) {
+      case "price_asc":
+        return [...list].sort((a, b) => Number(a.price) - Number(b.price));
+      case "price_desc":
+        return [...list].sort((a, b) => Number(b.price) - Number(a.price));
+      case "name":
+        return [...list].sort((a, b) => a.name.localeCompare(b.name));
+      default:
+        return list;
+    }
+  }, [products, category, debouncedSearch, sort]);
+
+  const quantityInCart = useMemo(() => {
+    const map = new Map<number, number>();
+    cart.forEach((item) => map.set(item.product.id, item.quantity));
+    return map;
+  }, [cart]);
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-
   const cartTotal = cart.reduce(
     (sum, item) => sum + Number(item.product.price) * item.quantity,
     0
   );
 
+  /* ----- cart actions ----- */
   function addToCart(product: Product) {
     if (product.stock_quantity < 1) return;
 
-    setCart((current) => {
-      const existing = current.find(
-        (item) => item.product.id === product.id
-      );
+    const already = quantityInCart.get(product.id) ?? 0;
+    if (already >= product.stock_quantity) {
+      showToast(`That's all we have of ${product.name} right now`);
+      return;
+    }
 
+    setCart((current) => {
+      const existing = current.find((item) => item.product.id === product.id);
       if (existing) {
         return current.map((item) =>
           item.product.id === product.id
             ? {
                 ...item,
-                quantity: Math.min(
-                  item.quantity + 1,
-                  product.stock_quantity
-                ),
+                quantity: Math.min(item.quantity + 1, product.stock_quantity),
               }
             : item
         );
       }
-
       return [...current, { product, quantity: 1 }];
     });
+
+    showToast(`${product.name} added to cart`);
   }
 
   function updateQuantity(productId: number, change: number) {
     setCart((current) =>
       current
-        .map((item) => {
-          if (item.product.id !== productId) return item;
-
-          return {
-            ...item,
-            quantity: Math.min(
-              item.product.stock_quantity,
-              item.quantity + change
-            ),
-          };
-        })
+        .map((item) =>
+          item.product.id === productId
+            ? {
+                ...item,
+                quantity: Math.min(
+                  item.product.stock_quantity,
+                  item.quantity + change
+                ),
+              }
+            : item
+        )
         .filter((item) => item.quantity > 0)
     );
   }
 
   function removeFromCart(productId: number) {
-    setCart((current) =>
-      current.filter((item) => item.product.id !== productId)
-    );
+    setCart((current) => current.filter((item) => item.product.id !== productId));
   }
 
-  function updateCustomer(field: keyof typeof customer, value: string) {
+  function updateCustomer<K extends keyof CustomerForm>(
+    field: K,
+    value: CustomerForm[K]
+  ) {
     setCustomer((current) => ({ ...current, [field]: value }));
   }
 
-  function openWhatsApp(message: string) {
+  /* ----- WhatsApp ----- */
+  function openWhatsApp(message: string): boolean {
     if (!whatsappNumber) {
-      setError(
-        "WhatsApp is not configured yet. Add VITE_WHATSAPP_NUMBER to frontend/.env."
+      setWhatsappNotice(
+        "WhatsApp isn't set up yet. Add VITE_WHATSAPP_NUMBER to frontend/.env."
       );
-      return;
+      showToast("WhatsApp isn't set up yet");
+      return false;
     }
 
     const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
     window.open(url, "_blank", "noopener,noreferrer");
+    return true;
   }
 
   function contactOnWhatsApp() {
-    openWhatsApp(
-      "Hello ALEX CANDY ENTERPRICE! I'd like to ask about your products."
-    );
+    openWhatsApp(`Hello ${BUSINESS_NAME}! I'd like to ask about your products.`);
   }
 
   function orderProductDirectly(product: Product) {
+    const quantity = quantityInCart.get(product.id) ?? 1;
     const message = [
-      "Hello ALEX CANDY ENTERPRICE!",
+      `Hello ${BUSINESS_NAME}!`,
       "",
       "I'd like to order this product directly:",
       `Product: ${product.name}`,
       `Price: ${money(product.price)}`,
-      "Quantity: 1",
+      `Quantity: ${quantity}`,
+      `Total: ${money(Number(product.price) * quantity)}`,
       "",
       "Please confirm availability and how I can pay.",
     ].join("\n");
@@ -240,11 +432,24 @@ function App() {
     openWhatsApp(message);
   }
 
+  /* ----- checkout ----- */
+  function openCheckout() {
+    setCartOpen(false);
+    setCheckoutOpen(true);
+    setFormError("");
+  }
+
   async function submitOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitting) return;
 
     if (cart.length === 0) {
-      setError("Add at least one treat to your cart first.");
+      setFormError("Add at least one treat to your cart first.");
+      return;
+    }
+
+    if (!isValidPhone(customer.customer_phone)) {
+      setFormError("Enter a valid phone number, like 0712 345 678.");
       return;
     }
 
@@ -252,25 +457,26 @@ function App() {
       customer.fulfillment_method === "delivery" &&
       !customer.delivery_address.trim()
     ) {
-      setError("Please enter your delivery address.");
+      setFormError("Please enter your delivery address.");
       return;
     }
 
     setSubmitting(true);
-    setError("");
+    setFormError("");
 
     try {
       const orderedItems = cart.map((item) => ({
         name: item.product.name,
         quantity: item.quantity,
-        price: Number(item.product.price),
         lineTotal: Number(item.product.price) * item.quantity,
       }));
 
-      const orderTotal = cartTotal;
-
       const response = await api.post<CheckoutResponse>("/orders/", {
         ...customer,
+        customer_name: customer.customer_name.trim(),
+        customer_phone: customer.customer_phone.replace(/[\s-]/g, ""),
+        customer_email: customer.customer_email.trim(),
+        customer_notes: customer.customer_notes.trim(),
         items: cart.map((item) => ({
           product_id: item.product.id,
           quantity: item.quantity,
@@ -278,9 +484,10 @@ function App() {
       });
 
       const order = response.data;
+      const isDelivery = customer.fulfillment_method === "delivery";
 
       const messageLines = [
-        "Hello ALEX CANDY ENTERPRICE! \u{1F36C}",
+        `Hello ${BUSINESS_NAME}! \u{1F36C}`,
         "",
         "I'd like to follow up on my online order.",
         `Order number: ${order.order_number}`,
@@ -291,21 +498,15 @@ function App() {
             `\u2022 ${item.name} x ${item.quantity} \u2014 ${money(item.lineTotal)}`
         ),
         "",
-        `Order total: ${money(orderTotal)}`,
+        `Order total: ${money(order.total ?? cartTotal)}`,
         "",
         "CUSTOMER DETAILS",
-        `Name: ${customer.customer_name}`,
-        `Phone: ${customer.customer_phone}`,
-        `Fulfilment: ${
-          customer.fulfillment_method === "delivery"
-            ? "Delivery"
-            : "Collection"
-        }`,
-        ...(customer.fulfillment_method === "delivery"
-          ? [`Delivery address: ${customer.delivery_address}`]
-          : []),
-        ...(customer.customer_email
-          ? [`Email: ${customer.customer_email}`]
+        `Name: ${customer.customer_name.trim()}`,
+        `Phone: ${customer.customer_phone.trim()}`,
+        `Fulfilment: ${isDelivery ? "Delivery" : "Collection"}`,
+        ...(isDelivery ? [`Delivery address: ${customer.delivery_address.trim()}`] : []),
+        ...(customer.customer_email.trim()
+          ? [`Email: ${customer.customer_email.trim()}`]
           : []),
         ...(customer.customer_notes.trim()
           ? [`Extra notes: ${customer.customer_notes.trim()}`]
@@ -319,65 +520,48 @@ function App() {
       setCart([]);
       setCheckoutOpen(false);
       setCartOpen(false);
+      // Keep name/phone for next time, clear the one-off fields.
+      setCustomer((current) => ({
+        ...current,
+        delivery_address: isDelivery ? current.delivery_address : "",
+        customer_notes: "",
+      }));
 
       try {
-        const refreshedProducts = await getProducts();
-        setProducts(
-          refreshedProducts.filter((product) => product.is_available)
-        );
+        const refreshed = await getProducts();
+        setProducts(refreshed.filter((product) => product.is_available));
       } catch {
-        // Keep the order confirmation visible if refreshing fails.
+        // Keep the confirmation visible if refreshing stock fails.
       }
     } catch (err: unknown) {
-      let message = "We couldn't place your order. Please try again.";
-
-      if (typeof err === "object" && err !== null && "response" in err) {
-        const response = (
-          err as {
-            response?: {
-              data?: {
-                detail?: string;
-                items?: string | string[];
-                delivery_address?: string | string[];
-                [key: string]: unknown;
-              };
-            };
-          }
-        ).response;
-
-        const data = response?.data;
-
-        if (data?.detail) {
-          message = data.detail;
-        } else if (data?.items) {
-          message = Array.isArray(data.items)
-            ? data.items.join(" ")
-            : data.items;
-        } else if (data?.delivery_address) {
-          message = Array.isArray(data.delivery_address)
-            ? data.delivery_address.join(" ")
-            : data.delivery_address;
-        } else if (data) {
-          const firstError = Object.values(data).find(
-            (value) =>
-              typeof value === "string" ||
-              (Array.isArray(value) &&
-                value.every((entry) => typeof entry === "string"))
-          );
-
-          if (typeof firstError === "string") {
-            message = firstError;
-          } else if (Array.isArray(firstError)) {
-            message = firstError.join(" ");
-          }
-        }
-      }
-
-      setError(message);
+      setFormError(getErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
   }
+
+  async function copyOrderNumber(orderNumber: string) {
+    try {
+      await navigator.clipboard.writeText(orderNumber);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      showToast("Couldn't copy. Please note the number down.");
+    }
+  }
+
+  function closeSuccess() {
+    setSuccessOrder(null);
+    setWhatsappOrderMessage("");
+    setWhatsappNotice("");
+    setCopied(false);
+  }
+
+  const navClass = (id: string) => (activeSection === id ? "nav-active" : undefined);
+
+  /* ---------------------------------------------------------------- */
+  /* Render                                                            */
+  /* ---------------------------------------------------------------- */
 
   return (
     <div className="shop">
@@ -399,10 +583,10 @@ function App() {
         </a>
 
         <nav className="desktop-nav" aria-label="Main navigation">
-          <a className="nav-active" href="#home">Home</a>
-          <a href="#products">Our products</a>
-          <a href="#track">Track order</a>
-          <a href="#about">About us</a>
+          <a className={navClass("home")} href="#home">Home</a>
+          <a className={navClass("products")} href="#products">Our products</a>
+          <a className={navClass("track")} href="#track">Track order</a>
+          <a className={navClass("about")} href="#about">About us</a>
         </nav>
 
         <div className="header-actions">
@@ -422,7 +606,7 @@ function App() {
         <section className="hero" id="home">
           <div className="hero-copy">
             <span className="eyebrow">
-              <Sparkles size={16} /> YOUR HAPPY PLACE FOR products
+              <Sparkles size={16} /> YOUR HAPPY PLACE FOR PRODUCTS
             </span>
             <h1>
               Life is better
@@ -479,7 +663,7 @@ function App() {
         <section className="benefits" id="about">
           <div className="benefit">
             <span className="benefit-icon pink">{"\u{1F36C}"}</span>
-            <div><strong>Sweet selection</strong><small>products for every craving</small></div>
+            <div><strong>Sweet selection</strong><small>Products for every craving</small></div>
           </div>
           <div className="benefit">
             <span className="benefit-icon yellow">{"\u2728"}</span>
@@ -518,41 +702,51 @@ function App() {
             </div>
           </div>
 
-          <div className="category-row" aria-label="Filter products by category">
-            {categories.map((item) => (
-              <button
-                key={item.id}
-                className={`category-chip ${category === item.id ? "selected" : ""}`}
-                onClick={() => setCategory(item.id)}
+          <div className="toolbar-row">
+            <div className="category-row" aria-label="Filter products by category">
+              {categories.map((item) => (
+                <button
+                  key={item.id}
+                  className={`category-chip ${category === item.id ? "selected" : ""}`}
+                  aria-pressed={category === item.id}
+                  onClick={() => setCategory(item.id)}
+                >
+                  <span>{item.emoji}</span> {item.label}
+                </button>
+              ))}
+            </div>
+
+            <label className="sort-control">
+              <span>Sort by</span>
+              <select
+                value={sort}
+                onChange={(event) => setSort(event.target.value as SortOption)}
               >
-                <span>{item.emoji}</span> {item.label}
-              </button>
-            ))}
+                {sortOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
 
-          {error && !checkoutOpen && !cartOpen && !successOrder && (
-            <div className="notice error-notice" role="alert">
-              {error}
-              <button onClick={() => setError("")} aria-label="Dismiss message">
-                <X size={16} />
-              </button>
-            </div>
-          )}
-
           {loading ? (
-            <div className="state-message">
-              <LoaderCircle className="spin" size={30} />
-              <p>Finding your favourite products...</p>
+            <div className="product-grid" aria-busy="true" aria-label="Loading products">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div className="product-card skeleton-card" key={index}>
+                  <div className="skeleton skeleton-image" />
+                  <div className="skeleton skeleton-line" />
+                  <div className="skeleton skeleton-line short" />
+                </div>
+              ))}
             </div>
-          ) : error && products.length === 0 ? (
-            <div className="state-message">
+          ) : loadError && products.length === 0 ? (
+            <div className="state-message" role="alert">
               <span className="state-emoji">{"\u{1F36D}"}</span>
               <h3>Our sweet shelf is taking a break</h3>
-              <p>{error}</p>
-              <button
-                className="primary-button"
-                onClick={() => window.location.reload()}
-              >
+              <p>{loadError}</p>
+              <button className="primary-button" onClick={() => void loadProducts()}>
                 Try again
               </button>
             </div>
@@ -575,10 +769,14 @@ function App() {
             <div className="product-grid">
               {filteredProducts.map((product, index) => {
                 const imageUrl = getLocalProductImage(product);
+                const inCart = quantityInCart.get(product.id) ?? 0;
+                const soldOut = product.stock_quantity < 1;
+                const maxedOut = inCart >= product.stock_quantity;
+                const lowStock = !soldOut && product.stock_quantity <= LOW_STOCK_THRESHOLD;
 
                 return (
                   <article
-                    className={`product-card product-card-${index % 4}`}
+                    className={`product-card product-card-${index % 4} ${soldOut ? "is-sold-out" : ""}`}
                     key={product.id}
                   >
                     <div className="product-image">
@@ -602,6 +800,12 @@ function App() {
                       <span className="product-category">
                         {categories.find((item) => item.id === product.category)?.label}
                       </span>
+                      {soldOut && <span className="stock-badge sold-out">Sold out</span>}
+                      {lowStock && (
+                        <span className="stock-badge low">
+                          Only {product.stock_quantity} left
+                        </span>
+                      )}
                     </div>
 
                     <div className="product-details">
@@ -611,15 +815,17 @@ function App() {
                         <div>
                           <strong className="product-price">{money(product.price)}</strong>
                           <small>
-                            {product.stock_quantity > 0
-                              ? `${product.stock_quantity} available`
-                              : "Currently sold out"}
+                            {soldOut
+                              ? "Currently sold out"
+                              : inCart > 0
+                                ? `${inCart} in your cart`
+                                : `${product.stock_quantity} available`}
                           </small>
                         </div>
                         <button
                           className="add-button"
                           onClick={() => addToCart(product)}
-                          disabled={product.stock_quantity < 1}
+                          disabled={soldOut || maxedOut}
                           aria-label={`Add ${product.name} to cart`}
                         >
                           <Plus size={20} />
@@ -628,7 +834,7 @@ function App() {
                       <button
                         className="product-whatsapp-button"
                         onClick={() => orderProductDirectly(product)}
-                        disabled={product.stock_quantity < 1}
+                        disabled={soldOut}
                       >
                         <MessageCircle size={15} />
                         Order direct on WhatsApp
@@ -637,6 +843,15 @@ function App() {
                   </article>
                 );
               })}
+            </div>
+          )}
+
+          {whatsappNotice && !successOrder && (
+            <div className="notice error-notice" role="alert">
+              {whatsappNotice}
+              <button onClick={() => setWhatsappNotice("")} aria-label="Dismiss message">
+                <X size={16} />
+              </button>
             </div>
           )}
         </section>
@@ -667,9 +882,10 @@ function App() {
           </span>
         </a>
         <p>Making everyday moments a little sweeter. {"\u{1F497}"}</p>
-        <span>{"\u00A9"} {new Date().getFullYear()} ALEX CANDY ENTERPRICE</span>
+        <span>{"\u00A9"} {new Date().getFullYear()} {BUSINESS_NAME}</span>
       </footer>
 
+      {/* ---------------- Cart ---------------- */}
       {cartOpen && (
         <div
           className="overlay"
@@ -677,7 +893,7 @@ function App() {
             if (event.target === event.currentTarget) setCartOpen(false);
           }}
         >
-          <aside className="side-panel" aria-label="Shopping cart">
+          <aside className="side-panel" role="dialog" aria-modal="true" aria-label="Shopping cart">
             <div className="panel-heading">
               <div>
                 <span className="eyebrow">YOUR SWEET PICKS</span>
@@ -700,45 +916,58 @@ function App() {
             ) : (
               <>
                 <div className="cart-items">
-                  {cart.map((item) => (
-                    <div className="cart-item" key={item.product.id}>
-                      <div className="cart-item-emoji">
-                        {categoryEmoji(item.product.category)}
-                      </div>
-                      <div className="cart-item-info">
-                        <strong>{item.product.name}</strong>
-                        <span>{money(item.product.price)}</span>
-                        <div className="quantity-control">
-                          <button onClick={() => updateQuantity(item.product.id, -1)} aria-label="Decrease quantity">
-                            <Minus size={14} />
-                          </button>
-                          <span>{item.quantity}</span>
-                          <button
-                            onClick={() => updateQuantity(item.product.id, 1)}
-                            disabled={item.quantity >= item.product.stock_quantity}
-                            aria-label="Increase quantity"
-                          >
-                            <Plus size={14} />
-                          </button>
+                  {cart.map((item) => {
+                    const imageUrl = getLocalProductImage(item.product);
+                    return (
+                      <div className="cart-item" key={item.product.id}>
+                        <div className="cart-item-emoji">
+                          {imageUrl && !failedImages[item.product.id] ? (
+                            <img
+                              className="cart-item-image"
+                              src={imageUrl}
+                              alt=""
+                              onError={() =>
+                                setFailedImages((current) => ({
+                                  ...current,
+                                  [item.product.id]: true,
+                                }))
+                              }
+                            />
+                          ) : (
+                            categoryEmoji(item.product.category)
+                          )}
                         </div>
+                        <div className="cart-item-info">
+                          <strong>{item.product.name}</strong>
+                          <span>
+                            {money(item.product.price)} each {"\u00B7"}{" "}
+                            <b>{money(Number(item.product.price) * item.quantity)}</b>
+                          </span>
+                          <div className="quantity-control">
+                            <button onClick={() => updateQuantity(item.product.id, -1)} aria-label={`Decrease ${item.product.name} quantity`}>
+                              <Minus size={14} />
+                            </button>
+                            <span aria-live="polite">{item.quantity}</span>
+                            <button
+                              onClick={() => updateQuantity(item.product.id, 1)}
+                              disabled={item.quantity >= item.product.stock_quantity}
+                              aria-label={`Increase ${item.product.name} quantity`}
+                            >
+                              <Plus size={14} />
+                            </button>
+                          </div>
+                        </div>
+                        <button className="remove-button" onClick={() => removeFromCart(item.product.id)} aria-label={`Remove ${item.product.name}`}>
+                          <Trash2 size={17} />
+                        </button>
                       </div>
-                      <button className="remove-button" onClick={() => removeFromCart(item.product.id)} aria-label={`Remove ${item.product.name}`}>
-                        <Trash2 size={17} />
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <div className="cart-summary">
                   <div className="summary-line"><span>Subtotal</span><strong>{money(cartTotal)}</strong></div>
                   <p>Delivery fees, if applicable, will be confirmed separately.</p>
-                  <button
-                    className="primary-button full-button"
-                    onClick={() => {
-                      setCartOpen(false);
-                      setCheckoutOpen(true);
-                      setError("");
-                    }}
-                  >
+                  <button className="primary-button full-button" onClick={openCheckout}>
                     Continue to checkout <ArrowRight size={18} />
                   </button>
                 </div>
@@ -748,6 +977,7 @@ function App() {
         </div>
       )}
 
+      {/* ---------------- Checkout ---------------- */}
       {checkoutOpen && (
         <div
           className="overlay"
@@ -757,7 +987,7 @@ function App() {
             }
           }}
         >
-          <section className="checkout-modal" aria-label="Checkout form">
+          <section className="checkout-modal" role="dialog" aria-modal="true" aria-label="Checkout form">
             <div className="panel-heading">
               <div>
                 <span className="eyebrow">ALMOST THERE!</span>
@@ -769,10 +999,10 @@ function App() {
               </button>
             </div>
 
-            {error && (
+            {formError && (
               <div className="notice error-notice" role="alert">
-                {error}
-                <button onClick={() => setError("")} aria-label="Dismiss message"><X size={16} /></button>
+                {formError}
+                <button onClick={() => setFormError("")} aria-label="Dismiss message"><X size={16} /></button>
               </div>
             )}
 
@@ -781,6 +1011,8 @@ function App() {
                 Your full name
                 <input
                   required
+                  autoFocus
+                  autoComplete="name"
                   minLength={2}
                   maxLength={150}
                   value={customer.customer_name}
@@ -794,6 +1026,8 @@ function App() {
                 <input
                   required
                   type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
                   maxLength={30}
                   value={customer.customer_phone}
                   onChange={(event) => updateCustomer("customer_phone", event.target.value)}
@@ -805,6 +1039,7 @@ function App() {
                 Email address <span className="optional-label">Optional</span>
                 <input
                   type="email"
+                  autoComplete="email"
                   maxLength={254}
                   value={customer.customer_email}
                   onChange={(event) => updateCustomer("customer_email", event.target.value)}
@@ -843,6 +1078,7 @@ function App() {
                   Delivery address
                   <textarea
                     required
+                    autoComplete="street-address"
                     maxLength={2000}
                     rows={3}
                     value={customer.delivery_address}
@@ -881,24 +1117,23 @@ function App() {
         </div>
       )}
 
+      {/* ---------------- Success ---------------- */}
       {successOrder && (
         <div className="overlay">
-          <section className="success-modal">
+          <section className="success-modal" role="dialog" aria-modal="true" aria-label="Order confirmation">
             <div className="success-icon"><CheckCircle2 size={42} /></div>
             <span className="eyebrow">ORDER RECEIVED!</span>
             <h2>Thanks for your order! {"\u{1F497}"}</h2>
-            <p>Your order has been saved. Keep this number for reference.</p>
+            <p>Your order has been saved. Keep this number to track it.</p>
 
             <div className="order-reference">
               <span>YOUR ORDER NUMBER</span>
               <strong>{successOrder.order_number}</strong>
               <button
                 className="secondary-button"
-                onClick={() => {
-                  void navigator.clipboard?.writeText(successOrder.order_number);
-                }}
+                onClick={() => void copyOrderNumber(successOrder.order_number)}
               >
-                Copy order number
+                {copied ? <><Check size={16} /> Copied</> : <><Copy size={16} /> Copy order number</>}
               </button>
             </div>
 
@@ -914,34 +1149,30 @@ function App() {
               Send order summary on WhatsApp
             </button>
 
-            {!whatsappNumber && (
-              <p className="secure-note">
-                Set VITE_WHATSAPP_NUMBER in frontend/.env to enable WhatsApp ordering.
-              </p>
-            )}
+            {whatsappNotice && <p className="secure-note">{whatsappNotice}</p>}
 
-            <button
-              className="secondary-button full-button"
-              onClick={() => {
-                setSuccessOrder(null);
-                setWhatsappOrderMessage("");
-                setError("");
-              }}
-            >
+            <button className="secondary-button full-button" onClick={closeSuccess}>
               Back to sweet shopping <ArrowRight size={18} />
             </button>
           </section>
         </div>
       )}
 
-      <button
-        className="floating-cart"
-        onClick={() => setCartOpen(true)}
-        aria-label={`Open shopping cart with ${cartCount} items`}
-      >
-        <ShoppingCart size={22} />
-        <span>{cartCount}</span>
-      </button>
+      {/* ---------------- Toast & floating cart ---------------- */}
+      <div className="toast-region" aria-live="polite" role="status">
+        {toast && <div className="toast">{toast}</div>}
+      </div>
+
+      {!anyOverlayOpen && (
+        <button
+          className="floating-cart"
+          onClick={() => setCartOpen(true)}
+          aria-label={`Open shopping cart with ${cartCount} items`}
+        >
+          <ShoppingCart size={22} />
+          <span>{cartCount}</span>
+        </button>
+      )}
     </div>
   );
 }

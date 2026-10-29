@@ -164,10 +164,15 @@ REST_FRAMEWORK = {
 }
 
 CORS_ALLOWED_ORIGINS = [
+    "https://alex-candy-enterprice.vercel.app",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://alex-candy-enterprice.vercel.app",
+    "https://alexcandyenterprice.onrender.com",
+]
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

@@ -67,7 +67,7 @@ const categoryEmoji = (productCategory: ProductCategory) =>
       ? "\u{1F95B}"
       : "\u{1F367}";
 
-// Always prefer your local images for known product categories.
+/** Prefer local images for known product categories / names. */
 function getLocalProductImage(product: Product): string | null {
   const productName = product.name.trim().toLowerCase();
 
@@ -196,14 +196,16 @@ function App() {
   const [activeSection, setActiveSection] = useState("home");
   const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
   const [customer, setCustomer] = useState<CustomerForm>(emptyCustomer);
+  const [phoneTouched, setPhoneTouched] = useState(false);
 
   const toastTimer = useRef<number | undefined>(undefined);
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
 
   /* ----- toast ----- */
   const showToast = useCallback((message: string) => {
     setToast(message);
     window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToast(""), 2200);
+    toastTimer.current = window.setTimeout(() => setToast(""), 2400);
   }, []);
 
   useEffect(() => () => window.clearTimeout(toastTimer.current), []);
@@ -247,7 +249,7 @@ function App() {
     try {
       localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
     } catch {
-      // Storage can be unavailable (private mode) - the cart still works.
+      // Storage can be unavailable (private mode) — the cart still works in-memory.
     }
   }, [cart]);
 
@@ -268,8 +270,16 @@ function App() {
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
-      if (checkoutOpen && !submitting) setCheckoutOpen(false);
-      else if (cartOpen) setCartOpen(false);
+      if (successOrder) {
+        setSuccessOrder(null);
+        setWhatsappOrderMessage("");
+        setWhatsappNotice("");
+        setCopied(false);
+      } else if (checkoutOpen && !submitting) {
+        setCheckoutOpen(false);
+      } else if (cartOpen) {
+        setCartOpen(false);
+      }
     }
 
     window.addEventListener("keydown", onKeyDown);
@@ -277,7 +287,15 @@ function App() {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [anyOverlayOpen, cartOpen, checkoutOpen, submitting]);
+  }, [anyOverlayOpen, cartOpen, checkoutOpen, submitting, successOrder]);
+
+  /* Auto-focus name field when checkout opens */
+  useEffect(() => {
+    if (checkoutOpen) {
+      const t = window.setTimeout(() => nameInputRef.current?.focus(), 50);
+      return () => window.clearTimeout(t);
+    }
+  }, [checkoutOpen]);
 
   /* ----- highlight current nav link while scrolling ----- */
   useEffect(() => {
@@ -307,7 +325,8 @@ function App() {
     const term = debouncedSearch.trim().toLowerCase();
 
     const list = products.filter((product) => {
-      const matchesCategory = category === "all" || product.category === category;
+      const matchesCategory =
+        category === "all" || product.category === category;
       const matchesSearch =
         !term ||
         product.name.toLowerCase().includes(term) ||
@@ -338,6 +357,10 @@ function App() {
     (sum, item) => sum + Number(item.product.price) * item.quantity,
     0
   );
+
+  const phoneLooksValid =
+    customer.customer_phone.trim().length === 0 ||
+    isValidPhone(customer.customer_phone);
 
   /* ----- cart actions ----- */
   function addToCart(product: Product) {
@@ -387,6 +410,7 @@ function App() {
 
   function removeFromCart(productId: number) {
     setCart((current) => current.filter((item) => item.product.id !== productId));
+    showToast("Item removed");
   }
 
   function updateCustomer<K extends keyof CustomerForm>(
@@ -416,7 +440,7 @@ function App() {
   }
 
   function orderProductDirectly(product: Product) {
-    const quantity = quantityInCart.get(product.id) ?? 1;
+    const quantity = Math.max(1, quantityInCart.get(product.id) ?? 1);
     const message = [
       `Hello ${BUSINESS_NAME}!`,
       "",
@@ -437,6 +461,7 @@ function App() {
     setCartOpen(false);
     setCheckoutOpen(true);
     setFormError("");
+    setPhoneTouched(false);
   }
 
   async function submitOrder(event: FormEvent<HTMLFormElement>) {
@@ -449,6 +474,7 @@ function App() {
     }
 
     if (!isValidPhone(customer.customer_phone)) {
+      setPhoneTouched(true);
       setFormError("Enter a valid phone number, like 0712 345 678.");
       return;
     }
@@ -504,7 +530,9 @@ function App() {
         `Name: ${customer.customer_name.trim()}`,
         `Phone: ${customer.customer_phone.trim()}`,
         `Fulfilment: ${isDelivery ? "Delivery" : "Collection"}`,
-        ...(isDelivery ? [`Delivery address: ${customer.delivery_address.trim()}`] : []),
+        ...(isDelivery
+          ? [`Delivery address: ${customer.delivery_address.trim()}`]
+          : []),
         ...(customer.customer_email.trim()
           ? [`Email: ${customer.customer_email.trim()}`]
           : []),
@@ -557,7 +585,8 @@ function App() {
     setCopied(false);
   }
 
-  const navClass = (id: string) => (activeSection === id ? "nav-active" : undefined);
+  const navClass = (id: string) =>
+    activeSection === id ? "nav-active" : undefined;
 
   /* ---------------------------------------------------------------- */
   /* Render                                                            */
@@ -574,7 +603,11 @@ function App() {
       <header className="site-header">
         <a className="brand" href="#home" aria-label="ALEX CANDY home">
           <span className="brand-icon brand-logo-frame">
-            <img className="brand-logo" src="/logo.jpeg" alt="ALEX CANDY logo" />
+            <img
+              className="brand-logo"
+              src="/logo.jpeg"
+              alt="ALEX CANDY logo"
+            />
           </span>
           <span className="brand-copy">
             <strong>ALEX CANDY</strong>
@@ -583,10 +616,18 @@ function App() {
         </a>
 
         <nav className="desktop-nav" aria-label="Main navigation">
-          <a className={navClass("home")} href="#home">Home</a>
-          <a className={navClass("products")} href="#products">Our products</a>
-          <a className={navClass("track")} href="#track">Track order</a>
-          <a className={navClass("about")} href="#about">About us</a>
+          <a className={navClass("home")} href="#home">
+            Home
+          </a>
+          <a className={navClass("products")} href="#products">
+            Our products
+          </a>
+          <a className={navClass("track")} href="#track">
+            Track order
+          </a>
+          <a className={navClass("about")} href="#about">
+            About us
+          </a>
         </nav>
 
         <div className="header-actions">
@@ -629,7 +670,9 @@ function App() {
             </div>
             <div className="hero-note">
               <span className="avatar-stack">
-                <i>{"\u{1F36D}"}</i><i>{"\u{1F366}"}</i><i>{"\u{1F36C}"}</i>
+                <i>{"\u{1F36D}"}</i>
+                <i>{"\u{1F366}"}</i>
+                <i>{"\u{1F36C}"}</i>
               </span>
               <span>
                 <strong>Made for happy moments</strong>
@@ -648,7 +691,11 @@ function App() {
             <span className="floating-sweet sweet-four">{"\u{1F367}"}</span>
             <div className="hero-sticker">
               <span>100%</span>
-              <strong>HAPPY<br />VIBES</strong>
+              <strong>
+                HAPPY
+                <br />
+                VIBES
+              </strong>
             </div>
             <div className="hero-caption">
               <span>{"\u2661"}</span>
@@ -663,19 +710,31 @@ function App() {
         <section className="benefits" id="about">
           <div className="benefit">
             <span className="benefit-icon pink">{"\u{1F36C}"}</span>
-            <div><strong>Sweet selection</strong><small>Products for every craving</small></div>
+            <div>
+              <strong>Sweet selection</strong>
+              <small>Products for every craving</small>
+            </div>
           </div>
           <div className="benefit">
             <span className="benefit-icon yellow">{"\u2728"}</span>
-            <div><strong>Happy moments</strong><small>Little joys, big smiles</small></div>
+            <div>
+              <strong>Happy moments</strong>
+              <small>Little joys, big smiles</small>
+            </div>
           </div>
           <div className="benefit">
             <span className="benefit-icon green">{"\u{1F6CD}\uFE0F"}</span>
-            <div><strong>Easy ordering</strong><small>Order online in a few clicks</small></div>
+            <div>
+              <strong>Easy ordering</strong>
+              <small>Order online in a few clicks</small>
+            </div>
           </div>
           <div className="benefit">
             <span className="benefit-icon purple">{"\u{1F497}"}</span>
-            <div><strong>Your choice</strong><small>Delivery or collection</small></div>
+            <div>
+              <strong>Your choice</strong>
+              <small>Delivery or collection</small>
+            </div>
           </div>
         </section>
 
@@ -683,8 +742,10 @@ function App() {
           <div className="section-heading">
             <div>
               <span className="eyebrow">A WORLD OF YUM</span>
-              <h2>Find your happy treat <span>{"\u2661"}</span></h2>
-              <p>What's making your taste buds smile today?</p>
+              <h2>
+                Find your happy treat <span>{"\u2661"}</span>
+              </h2>
+              <p>What&apos;s making your taste buds smile today?</p>
             </div>
             <div className="search-box">
               <Search size={18} />
@@ -703,11 +764,16 @@ function App() {
           </div>
 
           <div className="toolbar-row">
-            <div className="category-row" aria-label="Filter products by category">
+            <div
+              className="category-row"
+              aria-label="Filter products by category"
+            >
               {categories.map((item) => (
                 <button
                   key={item.id}
-                  className={`category-chip ${category === item.id ? "selected" : ""}`}
+                  className={`category-chip ${
+                    category === item.id ? "selected" : ""
+                  }`}
                   aria-pressed={category === item.id}
                   onClick={() => setCategory(item.id)}
                 >
@@ -720,7 +786,9 @@ function App() {
               <span>Sort by</span>
               <select
                 value={sort}
-                onChange={(event) => setSort(event.target.value as SortOption)}
+                onChange={(event) =>
+                  setSort(event.target.value as SortOption)
+                }
               >
                 {sortOptions.map((option) => (
                   <option key={option.id} value={option.id}>
@@ -732,7 +800,11 @@ function App() {
           </div>
 
           {loading ? (
-            <div className="product-grid" aria-busy="true" aria-label="Loading products">
+            <div
+              className="product-grid"
+              aria-busy="true"
+              aria-label="Loading products"
+            >
               {Array.from({ length: 6 }).map((_, index) => (
                 <div className="product-card skeleton-card" key={index}>
                   <div className="skeleton skeleton-image" />
@@ -746,7 +818,10 @@ function App() {
               <span className="state-emoji">{"\u{1F36D}"}</span>
               <h3>Our sweet shelf is taking a break</h3>
               <p>{loadError}</p>
-              <button className="primary-button" onClick={() => void loadProducts()}>
+              <button
+                className="primary-button"
+                onClick={() => void loadProducts()}
+              >
                 Try again
               </button>
             </div>
@@ -772,11 +847,14 @@ function App() {
                 const inCart = quantityInCart.get(product.id) ?? 0;
                 const soldOut = product.stock_quantity < 1;
                 const maxedOut = inCart >= product.stock_quantity;
-                const lowStock = !soldOut && product.stock_quantity <= LOW_STOCK_THRESHOLD;
+                const lowStock =
+                  !soldOut && product.stock_quantity <= LOW_STOCK_THRESHOLD;
 
                 return (
                   <article
-                    className={`product-card product-card-${index % 4} ${soldOut ? "is-sold-out" : ""}`}
+                    className={`product-card product-card-${index % 4} ${
+                      soldOut ? "is-sold-out" : ""
+                    }`}
                     key={product.id}
                   >
                     <div className="product-image">
@@ -785,6 +863,7 @@ function App() {
                           src={imageUrl}
                           alt={product.name}
                           loading="lazy"
+                          decoding="async"
                           onError={() =>
                             setFailedImages((current) => ({
                               ...current,
@@ -798,9 +877,15 @@ function App() {
                         </span>
                       )}
                       <span className="product-category">
-                        {categories.find((item) => item.id === product.category)?.label}
+                        {
+                          categories.find(
+                            (item) => item.id === product.category
+                          )?.label
+                        }
                       </span>
-                      {soldOut && <span className="stock-badge sold-out">Sold out</span>}
+                      {soldOut && (
+                        <span className="stock-badge sold-out">Sold out</span>
+                      )}
                       {lowStock && (
                         <span className="stock-badge low">
                           Only {product.stock_quantity} left
@@ -810,10 +895,15 @@ function App() {
 
                     <div className="product-details">
                       <h3>{product.name}</h3>
-                      <p>{product.description || "A little treat to brighten your day."}</p>
+                      <p>
+                        {product.description ||
+                          "A little treat to brighten your day."}
+                      </p>
                       <div className="product-bottom">
                         <div>
-                          <strong className="product-price">{money(product.price)}</strong>
+                          <strong className="product-price">
+                            {money(product.price)}
+                          </strong>
                           <small>
                             {soldOut
                               ? "Currently sold out"
@@ -822,15 +912,38 @@ function App() {
                                 : `${product.stock_quantity} available`}
                           </small>
                         </div>
-                        <button
-                          className="add-button"
-                          onClick={() => addToCart(product)}
-                          disabled={soldOut || maxedOut}
-                          aria-label={`Add ${product.name} to cart`}
-                        >
-                          <Plus size={20} />
-                        </button>
+
+                        {inCart > 0 && !soldOut ? (
+                          <div className="quantity-control card-qty">
+                            <button
+                              onClick={() =>
+                                updateQuantity(product.id, -1)
+                              }
+                              aria-label={`Decrease ${product.name} quantity`}
+                            >
+                              <Minus size={14} />
+                            </button>
+                            <span aria-live="polite">{inCart}</span>
+                            <button
+                              onClick={() => updateQuantity(product.id, 1)}
+                              disabled={maxedOut}
+                              aria-label={`Increase ${product.name} quantity`}
+                            >
+                              <Plus size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            className="add-button"
+                            onClick={() => addToCart(product)}
+                            disabled={soldOut || maxedOut}
+                            aria-label={`Add ${product.name} to cart`}
+                          >
+                            <Plus size={20} />
+                          </button>
+                        )}
                       </div>
+
                       <button
                         className="product-whatsapp-button"
                         onClick={() => orderProductDirectly(product)}
@@ -849,7 +962,10 @@ function App() {
           {whatsappNotice && !successOrder && (
             <div className="notice error-notice" role="alert">
               {whatsappNotice}
-              <button onClick={() => setWhatsappNotice("")} aria-label="Dismiss message">
+              <button
+                onClick={() => setWhatsappNotice("")}
+                aria-label="Dismiss message"
+              >
                 <X size={16} />
               </button>
             </div>
@@ -874,7 +990,11 @@ function App() {
       <footer className="site-footer">
         <a className="brand footer-brand" href="#home">
           <span className="brand-icon brand-logo-frame">
-            <img className="brand-logo" src="/logo.jpeg" alt="ALEX CANDY logo" />
+            <img
+              className="brand-logo"
+              src="/logo.jpeg"
+              alt="ALEX CANDY logo"
+            />
           </span>
           <span className="brand-copy">
             <strong>ALEX CANDY</strong>
@@ -882,7 +1002,9 @@ function App() {
           </span>
         </a>
         <p>Making everyday moments a little sweeter. {"\u{1F497}"}</p>
-        <span>{"\u00A9"} {new Date().getFullYear()} {BUSINESS_NAME}</span>
+        <span>
+          {"\u00A9"} {new Date().getFullYear()} {BUSINESS_NAME}
+        </span>
       </footer>
 
       {/* ---------------- Cart ---------------- */}
@@ -893,13 +1015,22 @@ function App() {
             if (event.target === event.currentTarget) setCartOpen(false);
           }}
         >
-          <aside className="side-panel" role="dialog" aria-modal="true" aria-label="Shopping cart">
+          <aside
+            className="side-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Shopping cart"
+          >
             <div className="panel-heading">
               <div>
                 <span className="eyebrow">YOUR SWEET PICKS</span>
                 <h2>Your cart ({cartCount})</h2>
               </div>
-              <button className="close-button" onClick={() => setCartOpen(false)} aria-label="Close cart">
+              <button
+                className="close-button"
+                onClick={() => setCartOpen(false)}
+                aria-label="Close cart"
+              >
                 <X />
               </button>
             </div>
@@ -908,8 +1039,11 @@ function App() {
               <div className="empty-cart">
                 <span>{"\u{1F6CD}\uFE0F"}</span>
                 <h3>Your cart is waiting for products!</h3>
-                <p>Add some goodies and they'll appear here.</p>
-                <button className="primary-button" onClick={() => setCartOpen(false)}>
+                <p>Add some goodies and they&apos;ll appear here.</p>
+                <button
+                  className="primary-button"
+                  onClick={() => setCartOpen(false)}
+                >
                   Browse products
                 </button>
               </div>
@@ -926,6 +1060,7 @@ function App() {
                               className="cart-item-image"
                               src={imageUrl}
                               alt=""
+                              decoding="async"
                               onError={() =>
                                 setFailedImages((current) => ({
                                   ...current,
@@ -941,23 +1076,40 @@ function App() {
                           <strong>{item.product.name}</strong>
                           <span>
                             {money(item.product.price)} each {"\u00B7"}{" "}
-                            <b>{money(Number(item.product.price) * item.quantity)}</b>
+                            <b>
+                              {money(
+                                Number(item.product.price) * item.quantity
+                              )}
+                            </b>
                           </span>
                           <div className="quantity-control">
-                            <button onClick={() => updateQuantity(item.product.id, -1)} aria-label={`Decrease ${item.product.name} quantity`}>
+                            <button
+                              onClick={() =>
+                                updateQuantity(item.product.id, -1)
+                              }
+                              aria-label={`Decrease ${item.product.name} quantity`}
+                            >
                               <Minus size={14} />
                             </button>
                             <span aria-live="polite">{item.quantity}</span>
                             <button
-                              onClick={() => updateQuantity(item.product.id, 1)}
-                              disabled={item.quantity >= item.product.stock_quantity}
+                              onClick={() =>
+                                updateQuantity(item.product.id, 1)
+                              }
+                              disabled={
+                                item.quantity >= item.product.stock_quantity
+                              }
                               aria-label={`Increase ${item.product.name} quantity`}
                             >
                               <Plus size={14} />
                             </button>
                           </div>
                         </div>
-                        <button className="remove-button" onClick={() => removeFromCart(item.product.id)} aria-label={`Remove ${item.product.name}`}>
+                        <button
+                          className="remove-button"
+                          onClick={() => removeFromCart(item.product.id)}
+                          aria-label={`Remove ${item.product.name}`}
+                        >
                           <Trash2 size={17} />
                         </button>
                       </div>
@@ -965,9 +1117,18 @@ function App() {
                   })}
                 </div>
                 <div className="cart-summary">
-                  <div className="summary-line"><span>Subtotal</span><strong>{money(cartTotal)}</strong></div>
-                  <p>Delivery fees, if applicable, will be confirmed separately.</p>
-                  <button className="primary-button full-button" onClick={openCheckout}>
+                  <div className="summary-line">
+                    <span>Subtotal</span>
+                    <strong>{money(cartTotal)}</strong>
+                  </div>
+                  <p>
+                    Delivery fees, if applicable, will be confirmed
+                    separately.
+                  </p>
+                  <button
+                    className="primary-button full-button"
+                    onClick={openCheckout}
+                  >
                     Continue to checkout <ArrowRight size={18} />
                   </button>
                 </div>
@@ -987,14 +1148,26 @@ function App() {
             }
           }}
         >
-          <section className="checkout-modal" role="dialog" aria-modal="true" aria-label="Checkout form">
+          <section
+            className="checkout-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Checkout form"
+          >
             <div className="panel-heading">
               <div>
                 <span className="eyebrow">ALMOST THERE!</span>
-                <h2>Let's place your order</h2>
-                <p className="modal-subtitle">Tell us where to send your sweetness.</p>
+                <h2>Let&apos;s place your order</h2>
+                <p className="modal-subtitle">
+                  Tell us where to send your sweetness.
+                </p>
               </div>
-              <button className="close-button" disabled={submitting} onClick={() => setCheckoutOpen(false)} aria-label="Close checkout">
+              <button
+                className="close-button"
+                disabled={submitting}
+                onClick={() => setCheckoutOpen(false)}
+                aria-label="Close checkout"
+              >
                 <X />
               </button>
             </div>
@@ -1002,7 +1175,12 @@ function App() {
             {formError && (
               <div className="notice error-notice" role="alert">
                 {formError}
-                <button onClick={() => setFormError("")} aria-label="Dismiss message"><X size={16} /></button>
+                <button
+                  onClick={() => setFormError("")}
+                  aria-label="Dismiss message"
+                >
+                  <X size={16} />
+                </button>
               </div>
             )}
 
@@ -1010,13 +1188,15 @@ function App() {
               <label>
                 Your full name
                 <input
+                  ref={nameInputRef}
                   required
-                  autoFocus
                   autoComplete="name"
                   minLength={2}
                   maxLength={150}
                   value={customer.customer_name}
-                  onChange={(event) => updateCustomer("customer_name", event.target.value)}
+                  onChange={(event) =>
+                    updateCustomer("customer_name", event.target.value)
+                  }
                   placeholder="e.g. Alex Mwangi"
                 />
               </label>
@@ -1030,46 +1210,78 @@ function App() {
                   autoComplete="tel"
                   maxLength={30}
                   value={customer.customer_phone}
-                  onChange={(event) => updateCustomer("customer_phone", event.target.value)}
+                  onChange={(event) =>
+                    updateCustomer("customer_phone", event.target.value)
+                  }
+                  onBlur={() => setPhoneTouched(true)}
                   placeholder="e.g. 0712 345 678"
+                  aria-invalid={phoneTouched && !phoneLooksValid}
                 />
+                {phoneTouched && !phoneLooksValid && (
+                  <small className="field-hint error">
+                    Use a valid Kenyan number (e.g. 0712 345 678)
+                  </small>
+                )}
               </label>
 
               <label>
-                Email address <span className="optional-label">Optional</span>
+                Email address{" "}
+                <span className="optional-label">Optional</span>
                 <input
                   type="email"
                   autoComplete="email"
                   maxLength={254}
                   value={customer.customer_email}
-                  onChange={(event) => updateCustomer("customer_email", event.target.value)}
+                  onChange={(event) =>
+                    updateCustomer("customer_email", event.target.value)
+                  }
                   placeholder="you@example.com"
                 />
               </label>
 
               <fieldset className="fulfillment-options">
                 <legend>How would you like your order?</legend>
-                <label className={`fulfillment-option ${customer.fulfillment_method === "collection" ? "chosen" : ""}`}>
+                <label
+                  className={`fulfillment-option ${
+                    customer.fulfillment_method === "collection"
+                      ? "chosen"
+                      : ""
+                  }`}
+                >
                   <input
                     type="radio"
                     name="fulfillment"
                     value="collection"
                     checked={customer.fulfillment_method === "collection"}
-                    onChange={() => updateCustomer("fulfillment_method", "collection")}
+                    onChange={() =>
+                      updateCustomer("fulfillment_method", "collection")
+                    }
                   />
                   <PackageCheck size={20} />
-                  <span><strong>Collection</strong><small>Pick it up yourself</small></span>
+                  <span>
+                    <strong>Collection</strong>
+                    <small>Pick it up yourself</small>
+                  </span>
                 </label>
-                <label className={`fulfillment-option ${customer.fulfillment_method === "delivery" ? "chosen" : ""}`}>
+                <label
+                  className={`fulfillment-option ${
+                    customer.fulfillment_method === "delivery" ? "chosen" : ""
+                  }`}
+                >
                   <input
                     type="radio"
                     name="fulfillment"
                     value="delivery"
                     checked={customer.fulfillment_method === "delivery"}
-                    onChange={() => updateCustomer("fulfillment_method", "delivery")}
+                    onChange={() =>
+                      updateCustomer("fulfillment_method", "delivery")
+                    }
                   />
                   <MapPin size={20} />
-                  <span><strong>Delivery</strong><small>Bring it to your address</small></span>
+                  <span>
+                    <strong>Delivery</strong>
+                    <small>Bring it to your address</small>
+                  </span>
                 </label>
               </fieldset>
 
@@ -1082,36 +1294,55 @@ function App() {
                     maxLength={2000}
                     rows={3}
                     value={customer.delivery_address}
-                    onChange={(event) => updateCustomer("delivery_address", event.target.value)}
+                    onChange={(event) =>
+                      updateCustomer("delivery_address", event.target.value)
+                    }
                     placeholder="Estate, street, building and nearby landmark"
                   />
                 </label>
               )}
 
               <label>
-                Extra notes <span className="optional-label">Optional</span>
+                Extra notes{" "}
+                <span className="optional-label">Optional</span>
                 <textarea
                   rows={2}
                   maxLength={2000}
                   value={customer.customer_notes}
-                  onChange={(event) => updateCustomer("customer_notes", event.target.value)}
+                  onChange={(event) =>
+                    updateCustomer("customer_notes", event.target.value)
+                  }
                   placeholder="Any special instructions?"
                 />
               </label>
 
               <div className="checkout-total">
-                <span>{cartCount} item{cartCount === 1 ? "" : "s"} {"\u00B7"} Order total</span>
+                <span>
+                  {cartCount} item{cartCount === 1 ? "" : "s"} {"\u00B7"}{" "}
+                  Order total
+                </span>
                 <strong>{money(cartTotal)}</strong>
               </div>
 
-              <button className="primary-button full-button" type="submit" disabled={submitting || cart.length === 0}>
+              <button
+                className="primary-button full-button"
+                type="submit"
+                disabled={submitting || cart.length === 0}
+              >
                 {submitting ? (
-                  <><LoaderCircle className="spin" size={18} /> Placing order...</>
+                  <>
+                    <LoaderCircle className="spin" size={18} /> Placing
+                    order...
+                  </>
                 ) : (
-                  <>Place my order <ArrowRight size={18} /></>
+                  <>
+                    Place my order <ArrowRight size={18} />
+                  </>
                 )}
               </button>
-              <p className="secure-note">Your order will be saved and sent to our shop for processing.</p>
+              <p className="secure-note">
+                Your order will be saved and sent to our shop for processing.
+              </p>
             </form>
           </section>
         </div>
@@ -1120,8 +1351,15 @@ function App() {
       {/* ---------------- Success ---------------- */}
       {successOrder && (
         <div className="overlay">
-          <section className="success-modal" role="dialog" aria-modal="true" aria-label="Order confirmation">
-            <div className="success-icon"><CheckCircle2 size={42} /></div>
+          <section
+            className="success-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Order confirmation"
+          >
+            <div className="success-icon">
+              <CheckCircle2 size={42} />
+            </div>
             <span className="eyebrow">ORDER RECEIVED!</span>
             <h2>Thanks for your order! {"\u{1F497}"}</h2>
             <p>Your order has been saved. Keep this number to track it.</p>
@@ -1133,7 +1371,15 @@ function App() {
                 className="secondary-button"
                 onClick={() => void copyOrderNumber(successOrder.order_number)}
               >
-                {copied ? <><Check size={16} /> Copied</> : <><Copy size={16} /> Copy order number</>}
+                {copied ? (
+                  <>
+                    <Check size={16} /> Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy size={16} /> Copy order number
+                  </>
+                )}
               </button>
             </div>
 
@@ -1149,9 +1395,14 @@ function App() {
               Send order summary on WhatsApp
             </button>
 
-            {whatsappNotice && <p className="secure-note">{whatsappNotice}</p>}
+            {whatsappNotice && (
+              <p className="secure-note">{whatsappNotice}</p>
+            )}
 
-            <button className="secondary-button full-button" onClick={closeSuccess}>
+            <button
+              className="secondary-button full-button"
+              onClick={closeSuccess}
+            >
               Back to sweet shopping <ArrowRight size={18} />
             </button>
           </section>
@@ -1165,7 +1416,7 @@ function App() {
 
       {!anyOverlayOpen && (
         <button
-          className="floating-cart"
+          className={`floating-cart ${cartCount === 0 ? "is-empty" : ""}`}
           onClick={() => setCartOpen(true)}
           aria-label={`Open shopping cart with ${cartCount} items`}
         >

@@ -66,7 +66,7 @@
   place-items: center;
   border-radius: 15px;
   background: var(--pink-light);
-  color: var(--pink);
+  color: orangered;
   transform: rotate(-5deg);
 }
 
@@ -117,7 +117,7 @@
   left: 0;
   height: 2px;
   border-radius: 10px;
-  background: var(--pink);
+  background: orangered;
   content: "";
 }
 
@@ -145,7 +145,7 @@
   height: 22px;
   place-items: center;
   border-radius: 50%;
-  background: var(--pink);
+  background: orangered;
   color: #fff;
   font-size: 11px;
 }
@@ -190,7 +190,7 @@
 .hero h1 span {
   position: relative;
   display: inline-block;
-  color: var(--pink);
+  color: orangered;
 }
 
 .hero h1 span::after {
@@ -231,7 +231,7 @@
   padding: 0 21px;
   border: 0;
   border-radius: 13px;
-  background: var(--pink);
+  background: orangered;
   box-shadow: 0 8px 19px rgba(240, 90, 152, 0.2);
   color: #fff;
   font-size: 12px;
@@ -447,7 +447,7 @@
 }
 
 .hero-caption > span {
-  color: var(--pink);
+  color: orangered;
   font-size: 24px;
 }
 
@@ -554,7 +554,7 @@
 }
 
 .section-heading h2 span {
-  color: var(--pink);
+  color: orangered;
 }
 
 .section-heading p {
@@ -635,8 +635,8 @@
 }
 
 .category-chip.selected {
-  border-color: var(--pink);
-  background: var(--pink);
+  border-color: orangered;
+  background: orangered;
   box-shadow: 0 6px 15px rgba(240, 90, 152, 0.15);
   color: #fff;
 }
@@ -786,7 +786,7 @@
 }
 
 .add-button:hover:not(:disabled) {
-  background: var(--pink);
+  background: orangered;
   color: #fff;
   transform: rotate(90deg);
 }
@@ -1241,7 +1241,7 @@
 }
 
 .fulfillment-option.chosen {
-  border-color: var(--pink);
+  border-color: orangered;
   background: #fff0f6;
   color: var(--pink-dark);
 }
@@ -1249,7 +1249,7 @@
 .fulfillment-option input {
   width: 14px;
   height: 14px;
-  accent-color: var(--pink);
+  accent-color: orangered;
 }
 
 .fulfillment-option > svg {
@@ -1385,7 +1385,7 @@
   gap: 4px;
   border: 3px solid #fff;
   border-radius: 18px;
-  background: var(--pink);
+  background: orangered;
   box-shadow: 0 8px 25px rgba(240, 90, 152, 0.3);
   color: #fff;
 }

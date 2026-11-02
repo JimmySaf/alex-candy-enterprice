@@ -681,30 +681,44 @@ function App() {
             </div>
           </div>
 
-          <div className="hero-art" aria-label="Colourful sweet products">
-            <div className="hero-orbit orbit-one" />
-            <div className="hero-orbit orbit-two" />
-            <div className="hero-sun">{"\u2726"}</div>
-            <span className="floating-sweet sweet-one">{"\u{1F36D}"}</span>
-            <span className="floating-sweet sweet-two">{"\u{1F36C}"}</span>
-            <span className="floating-sweet sweet-three">{"\u{1F366}"}</span>
-            <span className="floating-sweet sweet-four">{"\u{1F367}"}</span>
-            <div className="hero-sticker">
-              <span>100%</span>
-              <strong>
-                HAPPY
-                <br />
-                VIBES
-              </strong>
-            </div>
-            <div className="hero-caption">
-              <span>{"\u2661"}</span>
-              <div>
-                <strong>Sweeten your day</strong>
-                <small>One treat at a time</small>
-              </div>
-            </div>
-          </div>
+          <div className="hero-art" aria-label="Our featured sweet products">
+  <div className="hero-orbit orbit-one" />
+  <div className="hero-orbit orbit-two" />
+  <div className="hero-sun">{"\u2726"}</div>
+
+  <div className="hero-product sweet-one">
+    <img src="/products/sweets.jpeg" alt="Colourful candies" />
+  </div>
+
+  <div className="hero-product sweet-two">
+    <img src="/products/chocolate.jpeg" alt="Chocolate sweets" />
+  </div>
+
+  <div className="hero-product sweet-three">
+    <img src="/products/youghurt.jpeg" alt="Creamy yoghurt" />
+  </div>
+
+  <div className="hero-product sweet-four">
+    <img src="/products/icepop.jpeg" alt="Colourful ice pops" />
+  </div>
+
+  <div className="hero-sticker">
+    <span>100%</span>
+    <strong>
+      HAPPY
+      <br />
+      VIBES
+    </strong>
+  </div>
+
+  <div className="hero-caption">
+    <span>{"\u2661"}</span>
+    <div>
+      <strong>Sweeten your day</strong>
+      <small>One treat at a time</small>
+    </div>
+  </div>
+</div>
         </section>
 
         <section className="benefits" id="about">
@@ -858,31 +872,33 @@ function App() {
                     key={product.id}
                   >
                     <div className="product-image">
-                      {imageUrl && !failedImages[product.id] ? (
-                        <img
-                          src={imageUrl}
-                          alt={product.name}
-                          loading="lazy"
-                          decoding="async"
-                          onError={() =>
-                            setFailedImages((current) => ({
-                              ...current,
-                              [product.id]: true,
-                            }))
-                          }
-                        />
-                      ) : (
-                        <span className="product-emoji" aria-hidden="true">
-                          {categoryEmoji(product.category)}
-                        </span>
-                      )}
-                      <span className="product-category">
-                        {
-                          categories.find(
-                            (item) => item.id === product.category
-                          )?.label
-                        }
-                      </span>
+                     {imageUrl ? (
+  <img
+    src={imageUrl}
+    alt={product.name}
+    loading="lazy"
+    decoding="async"
+    onError={() =>
+      setFailedImages((current) => ({
+        ...current,
+        [product.id]: true,
+      }))
+    }
+  />
+) : (
+  <img
+    src={
+      product.category === "yoghurt"
+        ? "/products/youghurt.jpeg"
+        : product.category === "ice_pop"
+          ? "/products/icepop.jpeg"
+          : "/products/sweets.jpeg"
+    }
+    alt={product.name}
+    loading="lazy"
+    decoding="async"
+  />
+)}
                       {soldOut && (
                         <span className="stock-badge sold-out">Sold out</span>
                       )}

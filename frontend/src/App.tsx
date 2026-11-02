@@ -643,114 +643,167 @@ function App() {
         </div>
       </header>
 
-      <main>
-        <section className="hero" id="home">
-          <div className="hero-copy">
-            <span className="eyebrow">
-              <Sparkles size={16} /> YOUR HAPPY PLACE FOR PRODUCTS
-            </span>
-            <h1>
-              Life is better
-              <br />
-              with a little
-              <br />
-              <span>sweetness!</span>
-            </h1>
-            <p>
-              From colourful candies to creamy yoghurt and refreshing ice
-              pops, find a little happiness in every bite.
-            </p>
-            <div className="hero-actions">
-              <a className="primary-button" href="#products">
-                Explore Products <ArrowRight size={18} />
-              </a>
-              <button className="text-button" onClick={contactOnWhatsApp}>
-                Talk to us
-              </button>
-            </div>
-            <div className="hero-note">
-              <span className="avatar-stack">
-                <i>{"\u{1F36D}"}</i>
-                <i>{"\u{1F366}"}</i>
-                <i>{"\u{1F36C}"}</i>
-              </span>
-              <span>
-                <strong>Made for happy moments</strong>
-                <small>Pick your favourites today</small>
-              </span>
-            </div>
-          </div>
+     
+<main>
 
-          <div className="hero-art" aria-label="Our featured sweet products">
-  <div className="hero-orbit orbit-one" />
-  <div className="hero-orbit orbit-two" />
-  <div className="hero-sun">{"\u2726"}</div>
+<section className="store-hero" id="home">
+  {/* LEFT: STORE INTRODUCTION */}
+  <div className="store-hero-content">
+    <div className="store-hero-badge">
+      <span className="store-live-dot" />
+      WELCOME TO ALEX CANDY ENTERPRICE
+    </div>
 
-  <div className="hero-product sweet-one">
-    <img src="/products/sweets.jpeg" alt="Colourful candies" />
-  </div>
-
-  <div className="hero-product sweet-two">
-    <img src="/products/chocolate.jpeg" alt="Chocolate sweets" />
-  </div>
-
-  <div className="hero-product sweet-three">
-    <img src="/products/youghurt.jpeg" alt="Creamy yoghurt" />
-  </div>
-
-  <div className="hero-product sweet-four">
-    <img src="/products/icepop.jpeg" alt="Colourful ice pops" />
-  </div>
-
-  <div className="hero-sticker">
-    <span>100%</span>
-    <strong>
-      HAPPY
+    <h1>
+      Your favourite
       <br />
-      VIBES
-    </strong>
-  </div>
+      treats, all in
+      <br />
+      <span>one place.</span>
+    </h1>
 
-  <div className="hero-caption">
-    <span>{"\u2661"}</span>
-    <div>
-      <strong>Sweeten your day</strong>
-      <small>One treat at a time</small>
+    <p>
+      Discover a delicious collection of candies, creamy yoghurt
+      and refreshing ice pops. Find your favourites, shop with
+      ease and enjoy sweetness delivered your way.
+    </p>
+
+    <div className="store-hero-actions">
+      <a href="#products" className="store-shop-button">
+        Explore products
+        <ArrowRight size={18} />
+      </a>
+
+      <button
+        type="button"
+        className="store-contact-button"
+        onClick={contactOnWhatsApp}
+      >
+        <MessageCircle size={18} />
+        Contact seller
+      </button>
+    </div>
+
+    <div className="store-hero-benefits">
+      <span>
+        <CheckCircle2 size={16} />
+        Quality treats
+      </span>
+      <span>
+        <CheckCircle2 size={16} />
+        Easy ordering
+      </span>
+      <span>
+        <CheckCircle2 size={16} />
+        Delivery & collection
+      </span>
     </div>
   </div>
-</div>
-        </section>
 
-        <section className="benefits" id="about">
-          <div className="benefit">
-            <span className="benefit-icon pink">{"\u{1F36C}"}</span>
-            <div>
-              <strong>Sweet selection</strong>
-              <small>Products for every craving</small>
-            </div>
-          </div>
-          <div className="benefit">
-            <span className="benefit-icon yellow">{"\u2728"}</span>
-            <div>
-              <strong>Happy moments</strong>
-              <small>Little joys, big smiles</small>
-            </div>
-          </div>
-          <div className="benefit">
-            <span className="benefit-icon green">{"\u{1F6CD}\uFE0F"}</span>
-            <div>
-              <strong>Easy ordering</strong>
-              <small>Order online in a few clicks</small>
-            </div>
-          </div>
-          <div className="benefit">
-            <span className="benefit-icon purple">{"\u{1F497}"}</span>
-            <div>
-              <strong>Your choice</strong>
-              <small>Delivery or collection</small>
-            </div>
-          </div>
-        </section>
+  {/* RIGHT: ONLINE STORE DISPLAY */}
+  <div className="store-showcase">
+
+    {/* STORE TOP BAR */}
+    <div className="store-showcase-header">
+      <div className="store-showcase-heading">
+        <span>OUR STORE</span>
+        <h2>Featured products</h2>
+      </div>
+
+      <div className="store-availability">
+        <span />
+        Shop collection
+      </div>
+    </div>
+
+    {/* STORE SEARCH-STYLE BAR */}
+    <a href="#products" className="store-preview-search">
+      <Search size={17} />
+      <span>Explore our sweet collection...</span>
+      <ArrowRight size={17} />
+    </a>
+
+    {/* FEATURED PRODUCT CARDS */}
+    <div className="store-featured-grid">
+
+      <article className="store-featured-card">
+        <div className="store-featured-image">
+          <img
+            src="/products/sweets.jpeg"
+            alt="Colourful candies"
+          />
+          <span className="store-featured-tag">POPULAR</span>
+        </div>
+
+        <div className="store-featured-details">
+          <span>CANDIES</span>
+          <h3>Colourful Sweets</h3>
+          <p>Delicious little treats</p>
+          <a href="#products" aria-label="Shop candies">
+            View products <ArrowRight size={14} />
+          </a>
+        </div>
+      </article>
+
+      <article className="store-featured-card">
+        <div className="store-featured-image">
+          <img
+            src="/products/chocolate.jpeg"
+            alt="Chocolate sweets"
+          />
+          <span className="store-featured-tag">FAVOURITE</span>
+        </div>
+
+        <div className="store-featured-details">
+          <span>CHOCOLATE</span>
+          <h3>Chocolate Treats</h3>
+          <p>Rich and delicious</p>
+          <a href="#products" aria-label="Shop chocolate">
+            View products <ArrowRight size={14} />
+          </a>
+        </div>
+      </article>
+
+      <article className="store-featured-card">
+        <div className="store-featured-image">
+          <img
+            src="/products/icepop.jpeg"
+            alt="Colourful ice pops"
+          />
+          <span className="store-featured-tag">REFRESHING</span>
+        </div>
+
+        <div className="store-featured-details">
+          <span>ICE POPS</span>
+          <h3>Refreshing Ice Pops</h3>
+          <p>Cool and fruity flavours</p>
+          <a href="#products" aria-label="Shop ice pops">
+            View products <ArrowRight size={14} />
+          </a>
+        </div>
+      </article>
+
+    </div>
+
+    {/* STORE BOTTOM BAR */}
+    <div className="store-showcase-footer">
+      <div className="store-footer-symbol">
+        <ShoppingBag size={20} />
+      </div>
+
+      <div className="store-footer-copy">
+        <strong>Your next favourite treat is waiting.</strong>
+        <span>Browse the complete product collection.</span>
+      </div>
+
+      <a href="#products" aria-label="Browse all products">
+        <ArrowRight size={19} />
+      </a>
+    </div>
+
+  </div>
+</section>
+
 
         <section className="products-section" id="products">
           <div className="section-heading">

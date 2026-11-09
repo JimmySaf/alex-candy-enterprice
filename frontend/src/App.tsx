@@ -51,6 +51,7 @@ const categories: { id: CategoryFilter; label: string; emoji: string }[] = [
   { id: "candy", label: "Candies", emoji: "\u{1F36D}" },
   { id: "yoghurt", label: "Yoghurt", emoji: "\u{1F95B}" },
   { id: "ice_pop", label: "Ice pops", emoji: "\u{1F367}" },
+    { id: "chocolate", label: "Chocolate", emoji:"🍭"},
 ];
 
 const categoryEmoji = (productCategory: ProductCategory) =>
@@ -71,7 +72,7 @@ function getLocalProductImage(product: Product): string | null {
     return "/products/chocolate.jpeg";
   }
 
-  if (product.category === "candy") return "/products/sweets.jpeg";
+  if (product.category === "candy") return "/products/sweets.png";
 
   return getProductImage(product.image) || null;
 }
@@ -704,6 +705,7 @@ function App() {
       </header>
 
       <main>
+        <div className="store-stage">
         {/* ---------------- Store top: search + categories ---------------- */}
         <section className="store-top" id="home">
           <div className="store-top-inner">
@@ -890,12 +892,10 @@ function App() {
                           </small>
                         </div>
 
-                        {inCart > 0 && !soldOut ? (
+                        {inCart > 0 && !soldOut && (
                           <div className="quantity-control card-qty">
                             <button
-                              onClick={() =>
-                                updateQuantity(product.id, -1)
-                              }
+                              onClick={() => updateQuantity(product.id, -1)}
                               aria-label={`Decrease ${product.name} quantity`}
                             >
                               <Minus size={14} />
@@ -909,17 +909,25 @@ function App() {
                               <Plus size={14} />
                             </button>
                           </div>
-                        ) : (
-                          <button
-                            className="add-button"
-                            onClick={() => addToCart(product)}
-                            disabled={soldOut || maxedOut}
-                            aria-label={`Add ${product.name} to cart`}
-                          >
-                            <Plus size={20} />
-                          </button>
                         )}
                       </div>
+
+                      <button
+                        className="add-button"
+                        onClick={() => addToCart(product)}
+                        disabled={soldOut || maxedOut}
+                        aria-label={`Add ${product.name} to cart`}
+                      >
+                        {soldOut ? (
+                          "Sold out"
+                        ) : maxedOut ? (
+                          "All in your cart"
+                        ) : (
+                          <>
+                            <Plus size={16} /> Add to cart
+                          </>
+                        )}
+                      </button>
 
                       <button
                         className="product-whatsapp-button"
@@ -948,6 +956,7 @@ function App() {
             </div>
           )}
         </section>
+        </div>
 
         <OrderTracking />
 
@@ -978,7 +987,8 @@ function App() {
             <small>ENTERPRICE</small>
           </span>
         </a>
-        <p>Making everyday moments a little sweeter. {"\u{1F497}"}</p>
+
+  <p> Site by <a href="https://sajims-company.vercel.app/" target="_blank" rel="noopener noreferrer">Sajims company</a></p>
         <span>
           {"\u00A9"} {new Date().getFullYear()} {BUSINESS_NAME}
         </span>
@@ -1338,7 +1348,7 @@ function App() {
               <CheckCircle2 size={42} />
             </div>
             <span className="eyebrow">ORDER RECEIVED!</span>
-            <h2>Thanks for your order! {"\u{1F497}"}</h2>
+            <h2>Thanks for your order!</h2>
             <p>Your order has been saved. Keep this number to track it.</p>
 
             <div className="order-reference">

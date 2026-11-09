@@ -13,6 +13,7 @@ import {
   Copy,
   LoaderCircle,
   MapPin,
+  Menu,
   MessageCircle,
   Minus,
   PackageCheck,
@@ -44,20 +45,12 @@ const CART_STORAGE_KEY = "alex-candy-cart-v1";
 const LOW_STOCK_THRESHOLD = 5;
 
 type CategoryFilter = "all" | ProductCategory;
-type SortOption = "featured" | "price_asc" | "price_desc" | "name";
 
 const categories: { id: CategoryFilter; label: string; emoji: string }[] = [
   { id: "all", label: "All products", emoji: "\u{1F36C}" },
   { id: "candy", label: "Candies", emoji: "\u{1F36D}" },
   { id: "yoghurt", label: "Yoghurt", emoji: "\u{1F95B}" },
   { id: "ice_pop", label: "Ice pops", emoji: "\u{1F367}" },
-];
-
-const sortOptions: { id: SortOption; label: string }[] = [
-  { id: "featured", label: "Featured" },
-  { id: "price_asc", label: "Price: low to high" },
-  { id: "price_desc", label: "Price: high to low" },
-  { id: "name", label: "Name: A to Z" },
 ];
 
 const categoryEmoji = (productCategory: ProductCategory) =>
@@ -179,12 +172,12 @@ function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>(readStoredCart);
   const [category, setCategory] = useState<CategoryFilter>("all");
-  const [sort, setSort] = useState<SortOption>("featured");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [formError, setFormError] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -200,6 +193,7 @@ function App() {
 
   const toastTimer = useRef<number | undefined>(undefined);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
+  const headerRef = useRef<HTMLElement | null>(null);
 
   /* ----- toast ----- */
   const showToast = useCallback((message: string) => {
@@ -249,7 +243,7 @@ function App() {
     try {
       localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
     } catch {
-      // Storage can be unavailable (private mode) — the cart still works in-memory.
+      // Storage can be unavailable (private mode) - the cart still works in memory.
     }
   }, [cart]);
 
@@ -258,6 +252,30 @@ function App() {
     const id = window.setTimeout(() => setDebouncedSearch(search), 200);
     return () => window.clearTimeout(id);
   }, [search]);
+
+  /* ----- mobile menu: close on outside click / Escape ----- */
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    function onPointerDown(event: MouseEvent) {
+      if (
+        headerRef.current &&
+        !headerRef.current.contains(event.target as Node)
+      ) {
+        setMenuOpen(false);
+      }
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setMenuOpen(false);
+    }
+
+    document.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
 
   /* ----- Escape key + body scroll lock for overlays ----- */
   const anyOverlayOpen = cartOpen || checkoutOpen || !!successOrder;
@@ -321,10 +339,18 @@ function App() {
   }, [loading]);
 
   /* ----- derived data ----- */
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: products.length };
+    products.forEach((product) => {
+      counts[product.category] = (counts[product.category] ?? 0) + 1;
+    });
+    return counts;
+  }, [products]);
+
   const filteredProducts = useMemo(() => {
     const term = debouncedSearch.trim().toLowerCase();
 
-    const list = products.filter((product) => {
+    return products.filter((product) => {
       const matchesCategory =
         category === "all" || product.category === category;
       const matchesSearch =
@@ -333,18 +359,7 @@ function App() {
         (product.description ?? "").toLowerCase().includes(term);
       return matchesCategory && matchesSearch;
     });
-
-    switch (sort) {
-      case "price_asc":
-        return [...list].sort((a, b) => Number(a.price) - Number(b.price));
-      case "price_desc":
-        return [...list].sort((a, b) => Number(b.price) - Number(a.price));
-      case "name":
-        return [...list].sort((a, b) => a.name.localeCompare(b.name));
-      default:
-        return list;
-    }
-  }, [products, category, debouncedSearch, sort]);
+  }, [products, category, debouncedSearch]);
 
   const quantityInCart = useMemo(() => {
     const map = new Map<number, number>();
@@ -594,13 +609,7 @@ function App() {
 
   return (
     <div className="shop">
-      <div className="announcement">
-        <Sparkles size={15} />
-        <span>A little sweetness goes a long way!</span>
-        <Sparkles size={15} />
-      </div>
-
-      <header className="site-header">
+      <header className="site-header" ref={headerRef}>
         <a className="brand" href="#home" aria-label="ALEX CANDY home">
           <span className="brand-icon brand-logo-frame">
             <img
@@ -633,239 +642,138 @@ function App() {
         <div className="header-actions">
           <button
             className="icon-button cart-button"
-            onClick={() => setCartOpen(true)}
+            onClick={() => {
+              setMenuOpen(false);
+              setCartOpen(true);
+            }}
             aria-label={`Open cart, ${cartCount} items`}
           >
             <ShoppingBag size={21} />
             <span>Cart</span>
             <b>{cartCount}</b>
           </button>
+
+          <button
+            type="button"
+            className="menu-toggle"
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-menu"
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+          >
+            {menuOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
         </div>
+
+        {menuOpen && (
+          <nav
+            id="mobile-menu"
+            className="mobile-menu"
+            aria-label="Mobile navigation"
+          >
+            <a
+              className={navClass("home")}
+              href="#home"
+              onClick={() => setMenuOpen(false)}
+            >
+              Home
+            </a>
+            <a
+              className={navClass("products")}
+              href="#products"
+              onClick={() => setMenuOpen(false)}
+            >
+              Our products
+            </a>
+            <a
+              className={navClass("track")}
+              href="#track"
+              onClick={() => setMenuOpen(false)}
+            >
+              Track order
+            </a>
+            <a
+              className={navClass("about")}
+              href="#about"
+              onClick={() => setMenuOpen(false)}
+            >
+              About us
+            </a>
+          </nav>
+        )}
       </header>
 
-     
-<main>
+      <main>
+        {/* ---------------- Store top: search + categories ---------------- */}
+        <section className="store-top" id="home">
+          <div className="store-top-inner">
+            <span className="store-eyebrow">
+              <Sparkles size={14} /> Welcome to {BUSINESS_NAME}
+            </span>
 
-<section className="store-hero" id="home">
-  {/* LEFT: STORE INTRODUCTION */}
-  <div className="store-hero-content">
-    <div className="store-hero-badge">
-      <span className="store-live-dot" />
-      WELCOME TO ALEX CANDY ENTERPRICE
-    </div>
+            <h1>
+              Sweet treats, <span>one click away.</span>
+            </h1>
 
-    <h1>
-      Your favourite
-      <br />
-      treats, all in
-      <br />
-      <span>one place.</span>
-    </h1>
+            <p>
+              Pick your favourites, add them to your cart and place your order
+              in minutes.
+            </p>
 
-    <p>
-      Discover a delicious collection of candies, creamy yoghurt
-      and refreshing ice pops. Find your favourites, shop with
-      ease and enjoy sweetness delivered your way.
-    </p>
-
-    <div className="store-hero-actions">
-      <a href="#products" className="store-shop-button">
-        Explore products
-        <ArrowRight size={18} />
-      </a>
-
-      <button
-        type="button"
-        className="store-contact-button"
-        onClick={contactOnWhatsApp}
-      >
-        <MessageCircle size={18} />
-        Contact seller
-      </button>
-    </div>
-
-    <div className="store-hero-benefits">
-      <span>
-        <CheckCircle2 size={16} />
-        Quality treats
-      </span>
-      <span>
-        <CheckCircle2 size={16} />
-        Easy ordering
-      </span>
-      <span>
-        <CheckCircle2 size={16} />
-        Delivery & collection
-      </span>
-    </div>
-  </div>
-
-  {/* RIGHT: ONLINE STORE DISPLAY */}
-  <div className="store-showcase">
-
-    {/* STORE TOP BAR */}
-    <div className="store-showcase-header">
-      <div className="store-showcase-heading">
-        <span>OUR STORE</span>
-        <h2>Featured products</h2>
-      </div>
-
-      <div className="store-availability">
-        <span />
-        Shop collection
-      </div>
-    </div>
-
-    {/* STORE SEARCH-STYLE BAR */}
-    <a href="#products" className="store-preview-search">
-      <Search size={17} />
-      <span>Explore our sweet collection...</span>
-      <ArrowRight size={17} />
-    </a>
-
-    {/* FEATURED PRODUCT CARDS */}
-    <div className="store-featured-grid">
-
-      <article className="store-featured-card">
-        <div className="store-featured-image">
-          <img
-            src="/products/sweets.jpeg"
-            alt="Colourful candies"
-          />
-          <span className="store-featured-tag">POPULAR</span>
-        </div>
-
-        <div className="store-featured-details">
-          <span>CANDIES</span>
-          <h3>Colourful Sweets</h3>
-          <p>Delicious little treats</p>
-          <a href="#products" aria-label="Shop candies">
-            View products <ArrowRight size={14} />
-          </a>
-        </div>
-      </article>
-
-      <article className="store-featured-card">
-        <div className="store-featured-image">
-          <img
-            src="/products/chocolate.jpeg"
-            alt="Chocolate sweets"
-          />
-          <span className="store-featured-tag">FAVOURITE</span>
-        </div>
-
-        <div className="store-featured-details">
-          <span>CHOCOLATE</span>
-          <h3>Chocolate Treats</h3>
-          <p>Rich and delicious</p>
-          <a href="#products" aria-label="Shop chocolate">
-            View products <ArrowRight size={14} />
-          </a>
-        </div>
-      </article>
-
-      <article className="store-featured-card">
-        <div className="store-featured-image">
-          <img
-            src="/products/icepop.jpeg"
-            alt="Colourful ice pops"
-          />
-          <span className="store-featured-tag">REFRESHING</span>
-        </div>
-
-        <div className="store-featured-details">
-          <span>ICE POPS</span>
-          <h3>Refreshing Ice Pops</h3>
-          <p>Cool and fruity flavours</p>
-          <a href="#products" aria-label="Shop ice pops">
-            View products <ArrowRight size={14} />
-          </a>
-        </div>
-      </article>
-
-    </div>
-
-    {/* STORE BOTTOM BAR */}
-    <div className="store-showcase-footer">
-      <div className="store-footer-symbol">
-        <ShoppingBag size={20} />
-      </div>
-
-      <div className="store-footer-copy">
-        <strong>Your next favourite treat is waiting.</strong>
-        <span>Browse the complete product collection.</span>
-      </div>
-
-      <a href="#products" aria-label="Browse all products">
-        <ArrowRight size={19} />
-      </a>
-    </div>
-
-  </div>
-</section>
-
-
-        <section className="products-section" id="products">
-          <div className="section-heading">
-            <div>
-              <span className="eyebrow">A WORLD OF YUM</span>
-              <h2>
-                Find your happy treat <span>{"\u2661"}</span>
-              </h2>
-              <p>What&apos;s making your taste buds smile today?</p>
-            </div>
-            <div className="search-box">
-              <Search size={18} />
+            <form
+              className="store-search"
+              role="search"
+              onSubmit={(event) => event.preventDefault()}
+            >
+              <Search size={20} />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search sweet products..."
+                placeholder="Search all candy..."
                 aria-label="Search products"
               />
               {search && (
-                <button onClick={() => setSearch("")} aria-label="Clear search">
-                  <X size={16} />
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  aria-label="Clear search"
+                >
+                  <X size={18} />
                 </button>
               )}
-            </div>
-          </div>
+            </form>
 
-          <div className="toolbar-row">
-            <div
-              className="category-row"
-              aria-label="Filter products by category"
+            <div className="pill-row" aria-label="Filter products by category">
+              {categories.map((item) => {
+                const selected = category === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`pill ${selected ? "selected" : ""}`}
+                    aria-pressed={selected}
+                    onClick={() => setCategory(item.id)}
+                  >
+                    {selected && item.id !== "all" && <X size={13} />}
+                    {item.label} ({categoryCounts[item.id] ?? 0})
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              className="store-help"
+              onClick={contactOnWhatsApp}
             >
-              {categories.map((item) => (
-                <button
-                  key={item.id}
-                  className={`category-chip ${
-                    category === item.id ? "selected" : ""
-                  }`}
-                  aria-pressed={category === item.id}
-                  onClick={() => setCategory(item.id)}
-                >
-                  <span>{item.emoji}</span> {item.label}
-                </button>
-              ))}
-            </div>
-
-            <label className="sort-control">
-              <span>Sort by</span>
-              <select
-                value={sort}
-                onChange={(event) =>
-                  setSort(event.target.value as SortOption)
-                }
-              >
-                {sortOptions.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <MessageCircle size={16} />
+              Questions? Chat with us on WhatsApp
+            </button>
           </div>
+        </section>
 
+        {/* ---------------- Products ---------------- */}
+        <section className="products-section" id="products">
           {loading ? (
             <div
               className="product-grid"
@@ -925,33 +833,33 @@ function App() {
                     key={product.id}
                   >
                     <div className="product-image">
-                     {imageUrl ? (
-  <img
-    src={imageUrl}
-    alt={product.name}
-    loading="lazy"
-    decoding="async"
-    onError={() =>
-      setFailedImages((current) => ({
-        ...current,
-        [product.id]: true,
-      }))
-    }
-  />
-) : (
-  <img
-    src={
-      product.category === "yoghurt"
-        ? "/products/youghurt.jpeg"
-        : product.category === "ice_pop"
-          ? "/products/icepop.jpeg"
-          : "/products/sweets.jpeg"
-    }
-    alt={product.name}
-    loading="lazy"
-    decoding="async"
-  />
-)}
+                      {imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt={product.name}
+                          loading="lazy"
+                          decoding="async"
+                          onError={() =>
+                            setFailedImages((current) => ({
+                              ...current,
+                              [product.id]: true,
+                            }))
+                          }
+                        />
+                      ) : (
+                        <img
+                          src={
+                            product.category === "yoghurt"
+                              ? "/products/youghurt.jpeg"
+                              : product.category === "ice_pop"
+                                ? "/products/icepop.jpeg"
+                                : "/products/sweets.jpeg"
+                          }
+                          alt={product.name}
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      )}
                       {soldOut && (
                         <span className="stock-badge sold-out">Sold out</span>
                       )}

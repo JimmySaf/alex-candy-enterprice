@@ -1331,10 +1331,12 @@
 }
 
 .success-modal {
-  width: min(calc(100% - 30px), 430px);
+  width: min(calc(100% - 30px), 520px);
   align-self: center;
-  margin: auto;
-  padding: 32px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  margin: 16px auto;
+  padding: 28px;
   border-radius: 24px;
   background: #fff;
   box-shadow: 0 20px 60px rgba(38, 20, 38, 0.2);
@@ -1776,7 +1778,7 @@
     font-size: 11px;
   }
 
-  .success-modal {
+ .success-modal {
     padding: 26px 20px;
   }
 }
@@ -1804,5 +1806,169 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Pochi la Biashara payment                                           */
+/* ------------------------------------------------------------------ */
+
+.pochi-payment-panel {
+  margin: 20px 0 16px;
+  padding: 20px;
+  border: 1px solid var(--accent-line);
+  border-radius: 18px;
+  background: #fffaf6;
+  text-align: left;
+}
+
+.pochi-payment-panel > .eyebrow {
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+.pochi-payment-panel h3 {
+  margin: 7px 0 6px;
+  color: var(--ink);
+  font-size: 19px;
+}
+
+.pochi-instructions {
+  margin: 7px 0 13px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.pochi-number-row,
+.pochi-amount-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.pochi-number-row small {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.pochi-number-row strong {
+  color: var(--ink);
+  font-size: 20px;
+  letter-spacing: 0.04em;
+}
+
+.pochi-copy-button {
+  min-height: 36px;
+  padding: 7px 10px;
+  font-size: 11px;
+}
+
+.pochi-amount-row {
+  margin-top: 9px;
+  background: var(--accent-soft);
+}
+
+.pochi-amount-row span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pochi-amount-row strong {
+  color: var(--accent-dark);
+  font-size: 18px;
+}
+
+.payment-submit-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 15px;
+}
+
+.payment-submit-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: left;
+}
+
+.payment-submit-form input {
+  width: 100%;
+  min-height: 45px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  outline: none;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+
+.payment-submit-form input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.payment-submit-form .secure-note {
+  margin: 0;
+  font-size: 10px;
+}
+
+.payment-pending-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 13px;
+  border: 1px solid #cce8d0;
+  border-radius: 12px;
+  background: #f0faf1;
+  color: #26713a;
+  text-align: left;
+}
+
+.payment-pending-notice > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.payment-pending-notice strong {
+  font-size: 13px;
+}
+
+.payment-pending-notice p {
+  margin: 4px 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.payment-pending-notice small {
+  color: #52745a;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+@media (max-width: 480px) {
+  .pochi-payment-panel {
+    padding: 14px;
+  }
+
+  .pochi-number-row strong {
+    font-size: 17px;
   }
 }

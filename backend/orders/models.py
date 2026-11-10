@@ -1,7 +1,7 @@
-
 import uuid
 from decimal import Decimal
 
+from django.conf import settings
 from django.db import models
 from django.db.models import Q
 
@@ -94,3 +94,52 @@ class OrderItem(models.Model):
     @property
     def line_total(self):
         return self.unit_price * self.quantity
+
+
+class Payment(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending Verification"
+        VERIFIED = "verified", "Verified"
+        REJECTED = "rejected", "Rejected"
+
+    order = models.OneToOneField(
+        Order,
+        related_name="payment",
+        on_delete=models.CASCADE,
+    )
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+    transaction_code = models.CharField(
+        max_length=20,
+        unique=True,
+    )
+    payer_phone = models.CharField(max_length=30)
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
+
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="verified_alex_candy_payments",
+    )
+
+    admin_notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-submitted_at"]
+        verbose_name = "Payment"
+        verbose_name_plural = "Payments"
+
+    def __str__(self):
+        return f"{self.order.order_number} - {self.transaction_code}"

@@ -1,8 +1,7 @@
-
 from django.contrib import admin
 from django.utils import timezone
 
-from .models import Order, OrderItem
+from .models import Order, OrderItem, Payment
 
 
 class OrderItemInline(admin.TabularInline):
@@ -105,3 +104,98 @@ class OrderItemAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(Payment)
+class PaymentAdmin(admin.ModelAdmin):
+    list_display = (
+        "order",
+        "amount",
+        "transaction_code",
+        "payer_phone",
+        "status",
+        "submitted_at",
+        "verified_by",
+    )
+    list_filter = (
+        "status",
+        "submitted_at",
+        "verified_at",
+    )
+    search_fields = (
+        "order__order_number",
+        "order__customer_name",
+        "order__customer_phone",
+        "transaction_code",
+        "payer_phone",
+    )
+    readonly_fields = (
+        "order",
+        "amount",
+        "transaction_code",
+        "payer_phone",
+        "submitted_at",
+        "verified_at",
+        "verified_by",
+    )
+    fieldsets = (
+        (
+            "Payment details",
+            {
+                "fields": (
+                    "order",
+                    "amount",
+                    "transaction_code",
+                    "payer_phone",
+                    "status",
+                    "submitted_at",
+                )
+            },
+        ),
+        (
+            "Verification",
+            {
+                "fields": (
+                    "verified_at",
+                    "verified_by",
+                    "admin_notes",
+                )
+            },
+        ),
+    )
+    actions = (
+        "verify_selected_payments",
+        "reject_selected_payments",
+    )
+    list_per_page = 25
+    ordering = ("-submitted_at",)
+
+    @admin.action(description="Verify selected payments")
+    def verify_selected_payments(self, request, queryset):
+        for payment in queryset:
+            if payment.status == Payment.Status.PENDING:
+                payment.status = Payment.Status.VERIFIED
+                payment.verified_at = timezone.now()
+                payment.verified_by = request.user
+                payment.save(
+                    update_fields=[
+                        "status",
+                        "verified_at",
+                        "verified_by",
+                    ]
+                )
+
+    @admin.action(description="Reject selected payments")
+    def reject_selected_payments(self, request, queryset):
+        for payment in queryset:
+            if payment.status == Payment.Status.PENDING:
+                payment.status = Payment.Status.REJECTED
+                payment.verified_at = timezone.now()
+                payment.verified_by = request.user
+                payment.save(
+                    update_fields=[
+                        "status",
+                        "verified_at",
+                        "verified_by",
+                    ]
+                )

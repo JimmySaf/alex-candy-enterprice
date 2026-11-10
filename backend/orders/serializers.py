@@ -1,9 +1,23 @@
+import re
 
 from django.db import transaction
 from rest_framework import serializers
 
 from products.models import Product
-from .models import Order, OrderItem
+from .models import Order, OrderItem, Payment
+
+
+def normalize_phone(phone):
+    """
+    Normalize a Kenyan phone number for comparison.
+
+    Examples:
+    0712345678 -> 712345678
+    254712345678 -> 712345678
+    +254712345678 -> 712345678
+    """
+    digits = re.sub(r"\D", "", phone)
+    return digits[-9:]
 
 
 class OrderItemInputSerializer(serializers.Serializer):
@@ -71,10 +85,13 @@ class OrderCreateSerializer(serializers.ModelSerializer):
             })
 
         product_ids = [item["product_id"] for item in items]
+
         if len(product_ids) != len(set(product_ids)):
             raise serializers.ValidationError({
-                "items": "Each product should appear only once. "
-                         "Combine quantities for duplicate products."
+                "items": (
+                    "Each product should appear only once. "
+                    "Combine quantities for duplicate products."
+                )
             })
 
         if (
@@ -93,13 +110,11 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         requested_items = validated_data.pop("items")
         product_ids = [item["product_id"] for item in requested_items]
 
-        # Lock products where supported by the database.
         products = Product.objects.select_for_update().filter(
             id__in=product_ids
         )
         product_map = {product.id: product for product in products}
 
-        # Validate every item before creating the order or reducing stock.
         for item in requested_items:
             product = product_map.get(item["product_id"])
 
@@ -122,6 +137,7 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         order = Order.objects.create(**validated_data)
 
         order_items = []
+
         for item in requested_items:
             product = product_map[item["product_id"]]
             quantity = item["quantity"]
@@ -139,6 +155,7 @@ class OrderCreateSerializer(serializers.ModelSerializer):
             product.save(update_fields=["stock_quantity"])
 
         OrderItem.objects.bulk_create(order_items)
+
         return order
 
 
@@ -159,4 +176,131 @@ class OrderTrackingSerializer(serializers.ModelSerializer):
             "created_at",
             "total",
             "items",
+        ]
+
+
+class PaymentSubmissionSerializer(serializers.Serializer):
+    order_number = serializers.CharField(max_length=12)
+    customer_phone = serializers.CharField(max_length=30)
+    transaction_code = serializers.CharField(
+        min_length=8,
+        max_length=20,
+    )
+    payer_phone = serializers.CharField(max_length=30)
+
+    def validate_transaction_code(self, value):
+        code = re.sub(r"\s+", "", value).upper()
+
+        if not re.fullmatch(r"[A-Z0-9]{8,20}", code):
+            raise serializers.ValidationError(
+                "Enter a valid M-Pesa transaction code."
+            )
+
+        if Payment.objects.filter(transaction_code=code).exists():
+            raise serializers.ValidationError(
+                "This M-Pesa transaction code has already been submitted."
+            )
+
+        return code
+
+    def validate_payer_phone(self, value):
+        normalized = normalize_phone(value)
+
+        if not re.fullmatch(r"[17]\d{8}", normalized):
+            raise serializers.ValidationError(
+                "Enter a valid Kenyan M-Pesa phone number."
+            )
+
+        return value.strip()
+
+    def validate(self, attrs):
+        order_number = attrs["order_number"].strip().upper()
+        customer_phone = normalize_phone(attrs["customer_phone"])
+
+        if not customer_phone:
+            raise serializers.ValidationError({
+                "customer_phone": "Enter the phone number used for the order."
+            })
+
+        order = (
+            Order.objects
+            .filter(order_number=order_number)
+            .prefetch_related("items")
+            .first()
+        )
+
+        if (
+            order is None
+            or normalize_phone(order.customer_phone) != customer_phone
+        ):
+            raise serializers.ValidationError({
+                "order_number": (
+                    "Order not found. Check your order number "
+                    "and customer phone number."
+                )
+            })
+
+        if order.status == Order.Status.CANCELLED:
+            raise serializers.ValidationError({
+                "order_number": "Payment cannot be submitted for a cancelled order."
+            })
+
+        existing_payment = Payment.objects.filter(order=order).first()
+
+        if existing_payment:
+            if existing_payment.status != Payment.Status.REJECTED:
+                raise serializers.ValidationError({
+                    "order_number": (
+                        "A payment has already been submitted for this order. "
+                        "Contact the seller if you need assistance."
+                    )
+                })
+
+            attrs["existing_payment"] = existing_payment
+
+        attrs["order"] = order
+        return attrs
+
+    @transaction.atomic
+    def create(self, validated_data):
+        order = validated_data["order"]
+        existing_payment = validated_data.get("existing_payment")
+
+        payment_data = {
+            "amount": order.total,
+            "transaction_code": validated_data["transaction_code"],
+            "payer_phone": validated_data["payer_phone"],
+            "status": Payment.Status.PENDING,
+            "verified_at": None,
+            "verified_by": None,
+            "admin_notes": "",
+        }
+
+        if existing_payment:
+            for field, value in payment_data.items():
+                setattr(existing_payment, field, value)
+
+            existing_payment.save()
+            return existing_payment
+
+        return Payment.objects.create(
+            order=order,
+            **payment_data,
+        )
+
+
+class PaymentResponseSerializer(serializers.ModelSerializer):
+    order_number = serializers.CharField(
+        source="order.order_number",
+        read_only=True,
+    )
+
+    class Meta:
+        model = Payment
+        fields = [
+            "order_number",
+            "amount",
+            "transaction_code",
+            "status",
+            "submitted_at",
         ]

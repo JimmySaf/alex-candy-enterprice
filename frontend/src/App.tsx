@@ -65,21 +65,39 @@ const categoryEmoji = (productCategory: ProductCategory) =>
       ? "\u{1F95B}"
       : "\u{1F367}";
 
-/** Prefer local images for known product categories / names. */
+
+/**
+ * LOCAL PRODUCT IMAGES
+ */
 function getLocalProductImage(product: Product): string | null {
   const productName = product.name.trim().toLowerCase();
 
-  if (product.category === "ice_pop") return "/products/icepop.jpeg";
-  if (product.category === "yoghurt") return "/products/youghurt.jpeg";
+  // Specific product images
+  if (productName.includes("tropicals")) {
+    return "/products/tropicals.jpeg";
+  }
+
+  // Yoghurt products
+  if (product.category === "yoghurt") {
+    return "/products/youghurt.jpeg";
+  }
+
+  // Other existing product images
+  if (product.category === "ice_pop") {
+    return "/products/icepop.jpeg";
+  }
 
   if (productName.includes("chocolate") || productName.includes("duos")) {
     return "/products/chocolate.jpeg";
   }
 
-  if (product.category === "candy") return "/products/sweets.png";
+  if (product.category === "candy") {
+    return "/products/sweets.png";
+  }
 
   return getProductImage(product.image) || null;
 }
+
 
 const moneyFormatter = new Intl.NumberFormat("en-KE", {
   style: "currency",

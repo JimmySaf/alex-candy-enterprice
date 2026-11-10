@@ -31,6 +31,7 @@ import { getProductImage, getProducts } from "./services/products";
 import type {
   CartItem,
   CheckoutResponse,
+  PaymentSubmissionResponse,
   Product,
   ProductCategory,
 } from "./types/product";
@@ -43,6 +44,9 @@ import "./App.css";
 const BUSINESS_NAME = "ALEX CANDY ENTERPRICE"; // change spelling here once
 const CART_STORAGE_KEY = "alex-candy-cart-v1";
 const LOW_STOCK_THRESHOLD = 5;
+const POCHI_PHONE = (
+  import.meta.env.VITE_POCHI_PHONE as string | undefined
+)?.trim() || "0725941442";
 
 type CategoryFilter = "all" | ProductCategory;
 
@@ -183,6 +187,12 @@ function App() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [successOrder, setSuccessOrder] = useState<CheckoutResponse | null>(null);
+  const [paymentTransactionCode, setPaymentTransactionCode] = useState("");
+  const [paymentPayerPhone, setPaymentPayerPhone] = useState("");
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
+  const [paymentConfirmation, setPaymentConfirmation] = useState("");
+  const [paymentCopied, setPaymentCopied] = useState(false);
   const [whatsappOrderMessage, setWhatsappOrderMessage] = useState("");
   const [whatsappNotice, setWhatsappNotice] = useState("");
   const [copied, setCopied] = useState(false);
@@ -584,6 +594,49 @@ function App() {
     }
   }
 
+  async function submitPaymentDetails(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!successOrder || paymentSubmitting || paymentConfirmation) return;
+
+    if (!isValidPhone(paymentPayerPhone)) {
+      setPaymentError("Enter the Kenyan phone number you used to pay.");
+      return;
+    }
+
+    setPaymentSubmitting(true);
+    setPaymentError("");
+
+    try {
+      const response = await api.post<{
+        message: string;
+        payment: PaymentSubmissionResponse;
+      }>("/orders/payment/", {
+        order_number: successOrder.order_number,
+        customer_phone: customer.customer_phone.replace(/[\s-]/g, ""),
+        transaction_code: paymentTransactionCode.trim().toUpperCase(),
+        payer_phone: paymentPayerPhone.replace(/[\s-]/g, ""),
+      });
+
+      setPaymentConfirmation(
+        response.data.message || "Payment details submitted for verification."
+      );
+    } catch (err: unknown) {
+      setPaymentError(getErrorMessage(err));
+    } finally {
+      setPaymentSubmitting(false);
+    }
+  }
+
+  async function copyPochiNumber() {
+    try {
+      await navigator.clipboard.writeText(POCHI_PHONE);
+      setPaymentCopied(true);
+      window.setTimeout(() => setPaymentCopied(false), 1800);
+    } catch {
+      showToast("Couldn't copy the Pochi number. Please copy it manually.");
+    }
+  }
+
   async function copyOrderNumber(orderNumber: string) {
     try {
       await navigator.clipboard.writeText(orderNumber);
@@ -599,6 +652,11 @@ function App() {
     setWhatsappOrderMessage("");
     setWhatsappNotice("");
     setCopied(false);
+    setPaymentTransactionCode("");
+    setPaymentPayerPhone("");
+    setPaymentError("");
+    setPaymentConfirmation("");
+    setPaymentCopied(false);
   }
 
   const navClass = (id: string) =>
@@ -1374,8 +1432,95 @@ function App() {
               Order total: <strong>{money(successOrder.total)}</strong>
             </p>
 
+            <div className="pochi-payment-panel">
+              <span className="eyebrow">PAY WITH M-PESA</span>
+              <h3>Pay using Pochi la Biashara</h3>
+              <p className="pochi-instructions">
+                Open M-Pesa on your phone, choose Pochi la Biashara, and send
+                the exact order amount to the number below.
+              </p>
+              <div className="pochi-number-row">
+                <div>
+                  <small>POCHI BUSINESS NUMBER</small>
+                  <strong>{POCHI_PHONE}</strong>
+                </div>
+                <button
+                  className="secondary-button pochi-copy-button"
+                  type="button"
+                  onClick={() => void copyPochiNumber()}
+                >
+                  {paymentCopied ? <Check size={15} /> : <Copy size={15} />}
+                  {paymentCopied ? "Copied" : "Copy"}
+                </button>
+              </div>
+              <div className="pochi-amount-row">
+                <span>Amount to pay</span>
+                <strong>{money(successOrder.total)}</strong>
+              </div>
+              {paymentConfirmation ? (
+                <div className="payment-pending-notice" role="status">
+                  <CheckCircle2 size={20} />
+                  <div>
+                    <strong>Payment details received</strong>
+                    <p>{paymentConfirmation}</p>
+                    <small>Your payment is pending seller verification. Keep your M-Pesa confirmation message.</small>
+                  </div>
+                </div>
+              ) : (
+                <form className="payment-submit-form" onSubmit={submitPaymentDetails}>
+                  <p className="pochi-instructions">
+                    After paying, enter the M-Pesa transaction code and the
+                    phone number you paid from.
+                  </p>
+                  {paymentError && (
+                    <div className="notice error-notice" role="alert">
+                      {paymentError}
+                    </div>
+                  )}
+                  <label>
+                    M-Pesa transaction code
+                    <input
+                      required
+                      minLength={8}
+                      maxLength={20}
+                      value={paymentTransactionCode}
+                      onChange={(event) => setPaymentTransactionCode(event.target.value.toUpperCase())}
+                      placeholder="e.g. QWE1234567"
+                      autoComplete="off"
+                    />
+                  </label>
+                  <label>
+                    Phone number used to pay
+                    <input
+                      required
+                      type="tel"
+                      inputMode="tel"
+                      value={paymentPayerPhone}
+                      onChange={(event) => setPaymentPayerPhone(event.target.value)}
+                      placeholder="e.g. 0712 345 678"
+                    />
+                  </label>
+                  <button
+                    className="primary-button full-button"
+                    type="submit"
+                    disabled={paymentSubmitting}
+                  >
+                    {paymentSubmitting ? (
+                      <><LoaderCircle className="spin" size={18} /> Submitting details...</>
+                    ) : (
+                      <>Submit payment details <ArrowRight size={18} /></>
+                    )}
+                  </button>
+                  <p className="secure-note">
+                    Submitting details does not confirm payment. The seller
+                    will check the transaction in Pochi before approving it.
+                  </p>
+                </form>
+              )}
+            </div>
+
             <button
-              className="primary-button full-button"
+              className="secondary-button full-button"
               onClick={() => openWhatsApp(whatsappOrderMessage)}
             >
               <MessageCircle size={19} />

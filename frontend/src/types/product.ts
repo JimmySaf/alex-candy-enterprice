@@ -1,4 +1,3 @@
-
 export type ProductCategory =
   | "candy"
   | "yoghurt"
@@ -25,4 +24,12 @@ export interface CheckoutResponse {
   order_number: string;
   status: string;
   total: string | number;
+}
+
+export interface PaymentSubmissionResponse {
+  order_number: string;
+  amount: string | number;
+  transaction_code: string;
+  status: "pending" | "verified" | "rejected";
+  submitted_at: string;
 }

@@ -1,4 +1,9 @@
-export type ProductCategory = "candy" | "yoghurt" | "ice_pop";
+
+export type ProductCategory =
+  | "candy"
+  | "yoghurt"
+  | "ice_pop"
+  | "chocolate";
 
 export interface Product {
   id: number;

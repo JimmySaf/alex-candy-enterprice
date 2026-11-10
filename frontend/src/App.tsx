@@ -51,7 +51,7 @@ const categories: { id: CategoryFilter; label: string; emoji: string }[] = [
   { id: "candy", label: "Candies", emoji: "\u{1F36D}" },
   { id: "yoghurt", label: "Yoghurt", emoji: "\u{1F95B}" },
   { id: "ice_pop", label: "Ice pops", emoji: "\u{1F367}" },
-    { id: "chocolate", label: "Chocolate", emoji:"🍭"},
+  { id: "chocolate", label: "Chocolate", emoji: "🍫" },
 ];
 
 const categoryEmoji = (productCategory: ProductCategory) =>

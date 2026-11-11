@@ -81,7 +81,9 @@ function getLocalProductImage(product: Product): string | null {
 if (productName.includes("strawberry")) {
   return "/products/strawberry.jpeg";
 }
-
+if (productName.includes("vanilla")) {
+  return "/products/vanilla.jpeg";
+}
   if (productName.includes("tropicals")) {
     return "/products/tropicals.jpeg";
   }

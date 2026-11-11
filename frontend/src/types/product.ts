@@ -2,6 +2,7 @@ export type ProductCategory =
   | "candy"
   | "yoghurt"
   | "ice_pop"
+  | "strawberry"
   | "chocolate";
 
 export interface Product {

@@ -1100,7 +1100,7 @@ function App() {
 
             {cart.length === 0 ? (
               <div className="empty-cart">
-                <span>{"\u{1F6CD}\uFE0F"}</span>
+               
                 <h3>Your cart is waiting for products!</h3>
                 <p>Add some goodies and they&apos;ll appear here.</p>
                 <button

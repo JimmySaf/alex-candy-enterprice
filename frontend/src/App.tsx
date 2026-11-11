@@ -50,12 +50,17 @@ const POCHI_PHONE = (
 
 type CategoryFilter = "all" | ProductCategory;
 
-const categories: { id: CategoryFilter; label: string; emoji: string }[] = [
-  { id: "all", label: "All products", emoji: "\u{1F36C}" },
-  { id: "candy", label: "Candies", emoji: "\u{1F36D}" },
-  { id: "yoghurt", label: "Yoghurt", emoji: "\u{1F95B}" },
-  { id: "ice_pop", label: "Ice pops", emoji: "\u{1F367}" },
+const categories: {
+  id: CategoryFilter;
+  label: string;
+  emoji: string;
+}[] = [
+  { id: "all", label: "All products", emoji: "🍬" },
+  { id: "candy", label: "Candies", emoji: "🍭" },
+  { id: "yoghurt", label: "Yoghurt", emoji: "🥛" },
+  { id: "ice_pop", label: "Ice pops", emoji: "🍧" },
   { id: "chocolate", label: "Chocolate", emoji: "🍫" },
+  { id: "strawberry", label: "Strawberry", emoji: "🍓" },
 ];
 
 const categoryEmoji = (productCategory: ProductCategory) =>
@@ -73,6 +78,10 @@ function getLocalProductImage(product: Product): string | null {
   const productName = product.name.trim().toLowerCase();
 
   // Specific product images
+if (productName.includes("strawberry")) {
+  return "/products/strawberry.jpeg";
+}
+
   if (productName.includes("tropicals")) {
     return "/products/tropicals.jpeg";
   }

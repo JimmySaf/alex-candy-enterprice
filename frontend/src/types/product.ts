@@ -3,7 +3,8 @@ export type ProductCategory =
   | "yoghurt"
   | "ice_pop"
   | "strawberry"
-  | "chocolate";
+  | "chocolate"
+  | "vanilla";
 
 export interface Product {
   id: number;

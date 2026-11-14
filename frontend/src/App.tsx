@@ -60,7 +60,8 @@ const categories: {
   { id: "ice_pop", label: "Ice pops", emoji: "🍧" },
   { id: "chocolate", label: "Chocolate", emoji: "🍫" },
   { id: "strawberry", label: "Strawberry", emoji: "🍓" },
-  { id: "ocool", label: "Scool", emoji: "🍓" },
+  { id: "ocool", label: "Ocool", emoji: "🍓" },
+   { id: "icecream", label: "icecream", emoji: "🍓" },
 ];
 
 const categoryEmoji = (productCategory: ProductCategory) =>
@@ -74,19 +75,21 @@ const categoryEmoji = (productCategory: ProductCategory) =>
 /**
  * LOCAL PRODUCT IMAGES
  */
+
 function getLocalProductImage(product: Product): string | null {
   const productName = product.name.trim().toLowerCase();
 
-  // Specific product images
-if (productName.includes("strawberry")) {
-  return "/products/strawberry.jpeg";
-}
-if (productName.includes("vanilla")) {
-  return "/products/vanilla.jpeg";
-}
+  // Strawberry products
+  if (productName.includes("strawberry")) {
+    return "/products/strawberry.jpeg";
+  }
+
+  // Tropical products
   if (productName.includes("tropicals")) {
     return "/products/tropicals.jpeg";
   }
+
+  // O'Cool products
   if (productName.includes("ocool")) {
     return "/products/ocool.png";
   }
@@ -96,20 +99,25 @@ if (productName.includes("vanilla")) {
     return "/products/youghurt.jpeg";
   }
 
-  // Other existing product images
+  // Ice pop products
   if (product.category === "ice_pop") {
     return "/products/icepop.jpeg";
   }
 
-  if (productName.includes("chocolate") || productName.includes("duos")) {
+  // Chocolate products
+  if (
+    productName.includes("chocolate") ||
+    productName.includes("duos")
+  ) {
     return "/products/chocolate.jpeg";
   }
 
+  // Other candy products
   if (product.category === "candy") {
     return "/products/sweets.png";
   }
-  
 
+  // Fallback to the image supplied by Django
   return getProductImage(product.image) || null;
 }
 

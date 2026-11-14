@@ -87,6 +87,9 @@ if (productName.includes("vanilla")) {
   if (productName.includes("tropicals")) {
     return "/products/tropicals.jpeg";
   }
+  if (productName.includes("ocool")) {
+    return "/products/ocool.png";
+  }
 
   // Yoghurt products
   if (product.category === "yoghurt") {
@@ -105,6 +108,7 @@ if (productName.includes("vanilla")) {
   if (product.category === "candy") {
     return "/products/sweets.png";
   }
+  
 
   return getProductImage(product.image) || null;
 }

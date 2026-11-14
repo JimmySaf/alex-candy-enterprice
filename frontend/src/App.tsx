@@ -60,7 +60,7 @@ const categories: {
   { id: "ice_pop", label: "Ice pops", emoji: "🍧" },
   { id: "chocolate", label: "Chocolate", emoji: "🍫" },
   { id: "strawberry", label: "Strawberry", emoji: "🍓" },
-  { id: "ocool", label: "ocool", emoji: "🍓" },
+  { id: "ocool", label: "Scool", emoji: "🍓" },
 ];
 
 const categoryEmoji = (productCategory: ProductCategory) =>

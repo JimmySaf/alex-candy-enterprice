@@ -83,7 +83,9 @@ function getLocalProductImage(product: Product): string | null {
   if (productName.includes("strawberry")) {
     return "/products/strawberry.jpeg";
   }
-
+  if (productName.includes("icool")) {
+    return "/products/icool.png";
+  }
   // Tropical products
   if (productName.includes("tropicals")) {
     return "/products/tropicals.jpeg";

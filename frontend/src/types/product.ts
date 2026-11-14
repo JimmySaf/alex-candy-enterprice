@@ -4,7 +4,9 @@ export type ProductCategory =
   | "ice_pop"
   | "strawberry"
   | "chocolate"
+  | "ocool"
   | "vanilla";
+  
 
 export interface Product {
   id: number;

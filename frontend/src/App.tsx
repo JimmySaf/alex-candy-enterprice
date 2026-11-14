@@ -31,7 +31,6 @@ import { getProductImage, getProducts } from "./services/products";
 import type {
   CartItem,
   CheckoutResponse,
-  PaymentSubmissionResponse,
   Product,
   ProductCategory,
 } from "./types/product";
@@ -61,6 +60,7 @@ const categories: {
   { id: "ice_pop", label: "Ice pops", emoji: "🍧" },
   { id: "chocolate", label: "Chocolate", emoji: "🍫" },
   { id: "strawberry", label: "Strawberry", emoji: "🍓" },
+  { id: "ocool", label: "ocool", emoji: "🍓" },
 ];
 
 const categoryEmoji = (productCategory: ProductCategory) =>
@@ -216,14 +216,10 @@ function App() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [successOrder, setSuccessOrder] = useState<CheckoutResponse | null>(null);
-  const [paymentTransactionCode, setPaymentTransactionCode] = useState("");
-  const [paymentPayerPhone, setPaymentPayerPhone] = useState("");
-  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
-  const [paymentError, setPaymentError] = useState("");
-  const [paymentConfirmation, setPaymentConfirmation] = useState("");
   const [paymentCopied, setPaymentCopied] = useState(false);
   const [whatsappOrderMessage, setWhatsappOrderMessage] = useState("");
   const [whatsappNotice, setWhatsappNotice] = useState("");
+  const [whatsappSent, setWhatsappSent] = useState(false);
   const [copied, setCopied] = useState(false);
   const [toast, setToast] = useState("");
   const [activeSection, setActiveSection] = useState("home");
@@ -332,7 +328,9 @@ function App() {
         setSuccessOrder(null);
         setWhatsappOrderMessage("");
         setWhatsappNotice("");
+        setWhatsappSent(false);
         setCopied(false);
+        setPaymentCopied(false);
       } else if (checkoutOpen && !submitting) {
         setCheckoutOpen(false);
       } else if (cartOpen) {
@@ -542,6 +540,22 @@ function App() {
       return;
     }
 
+    // Open the WhatsApp tab right now, while we are still inside the customer's
+    // click. Browsers block pop-ups that open after a network request finishes.
+    // We point it at the order summary as soon as the order is saved.
+    const waWindow = whatsappNumber ? window.open("", "_blank") : null;
+    if (waWindow) {
+      try {
+        waWindow.document.title = "Sending your order...";
+        waWindow.document.body.style.cssText =
+          "font-family:sans-serif;padding:28px;color:#34243c";
+        waWindow.document.body.textContent =
+          "Placing your order and opening WhatsApp... please wait.";
+      } catch {
+        // The placeholder text is optional.
+      }
+    }
+
     setSubmitting(true);
     setFormError("");
 
@@ -570,7 +584,7 @@ function App() {
       const messageLines = [
         `Hello ${BUSINESS_NAME}! \u{1F36C}`,
         "",
-        "I'd like to follow up on my online order.",
+        "I've just placed an online order.",
         `Order number: ${order.order_number}`,
         "",
         "ORDER SUMMARY",
@@ -595,10 +609,31 @@ function App() {
           ? [`Extra notes: ${customer.customer_notes.trim()}`]
           : []),
         "",
-        "Please confirm the order and any applicable delivery fee. Thank you!",
+        "I'll pay with M-Pesa (Pochi la Biashara) and send the confirmation message here. Please confirm the order and any applicable delivery fee. Thank you!",
       ];
 
-      setWhatsappOrderMessage(messageLines.join("\n"));
+      const summary = messageLines.join("\n");
+
+      // Send the order details to WhatsApp automatically.
+      let sentToWhatsApp = false;
+      if (whatsappNumber) {
+        const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(summary)}`;
+        if (waWindow && !waWindow.closed) {
+          waWindow.opener = null;
+          waWindow.location.href = url;
+          sentToWhatsApp = true;
+        } else {
+          showToast("Tap 'Send order summary on WhatsApp' to share your order.");
+        }
+      } else {
+        setWhatsappNotice(
+          "WhatsApp isn't set up yet. Add VITE_WHATSAPP_NUMBER to frontend/.env."
+        );
+      }
+
+      // Next step: mode of payment
+      setWhatsappOrderMessage(summary);
+      setWhatsappSent(sentToWhatsApp);
       setSuccessOrder(order);
       setCart([]);
       setCheckoutOpen(false);
@@ -617,42 +652,11 @@ function App() {
         // Keep the confirmation visible if refreshing stock fails.
       }
     } catch (err: unknown) {
+      // The order failed, so close the WhatsApp tab we opened early.
+      if (waWindow && !waWindow.closed) waWindow.close();
       setFormError(getErrorMessage(err));
     } finally {
       setSubmitting(false);
-    }
-  }
-
-  async function submitPaymentDetails(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!successOrder || paymentSubmitting || paymentConfirmation) return;
-
-    if (!isValidPhone(paymentPayerPhone)) {
-      setPaymentError("Enter the Kenyan phone number you used to pay.");
-      return;
-    }
-
-    setPaymentSubmitting(true);
-    setPaymentError("");
-
-    try {
-      const response = await api.post<{
-        message: string;
-        payment: PaymentSubmissionResponse;
-      }>("/orders/payment/", {
-        order_number: successOrder.order_number,
-        customer_phone: customer.customer_phone.replace(/[\s-]/g, ""),
-        transaction_code: paymentTransactionCode.trim().toUpperCase(),
-        payer_phone: paymentPayerPhone.replace(/[\s-]/g, ""),
-      });
-
-      setPaymentConfirmation(
-        response.data.message || "Payment details submitted for verification."
-      );
-    } catch (err: unknown) {
-      setPaymentError(getErrorMessage(err));
-    } finally {
-      setPaymentSubmitting(false);
     }
   }
 
@@ -680,11 +684,8 @@ function App() {
     setSuccessOrder(null);
     setWhatsappOrderMessage("");
     setWhatsappNotice("");
+    setWhatsappSent(false);
     setCopied(false);
-    setPaymentTransactionCode("");
-    setPaymentPayerPhone("");
-    setPaymentError("");
-    setPaymentConfirmation("");
     setPaymentCopied(false);
   }
 
@@ -1415,21 +1416,22 @@ function App() {
                 )}
               </button>
               <p className="secure-note">
-                Your order will be saved and sent to our shop for processing.
+                Your order will be saved and its details sent to our shop on
+                WhatsApp.
               </p>
             </form>
           </section>
         </div>
       )}
 
-      {/* ---------------- Success ---------------- */}
+      {/* ---------------- Order placed -> mode of payment ---------------- */}
       {successOrder && (
         <div className="overlay">
           <section
             className="success-modal"
             role="dialog"
             aria-modal="true"
-            aria-label="Order confirmation"
+            aria-label="Order confirmation and payment"
           >
             <div className="success-icon">
               <CheckCircle2 size={42} />
@@ -1457,13 +1459,22 @@ function App() {
               </button>
             </div>
 
-            <p className="success-total">
-              Order total: <strong>{money(successOrder.total)}</strong>
-            </p>
+            {whatsappSent && (
+              <div className="payment-pending-notice" role="status">
+                <CheckCircle2 size={20} />
+                <div>
+                  <strong>Order details sent to WhatsApp</strong>
+                  <p>
+                    We opened WhatsApp with your order summary. Tap Send there
+                    so the shop receives it.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="pochi-payment-panel">
-              <span className="eyebrow">PAY WITH M-PESA</span>
-              <h3>Pay using Pochi la Biashara</h3>
+              <span className="eyebrow">MODE OF PAYMENT</span>
+              <h3>Pay with M-Pesa (Pochi la Biashara)</h3>
               <p className="pochi-instructions">
                 Open M-Pesa on your phone, choose Pochi la Biashara, and send
                 the exact order amount to the number below.
@@ -1486,66 +1497,10 @@ function App() {
                 <span>Amount to pay</span>
                 <strong>{money(successOrder.total)}</strong>
               </div>
-              {paymentConfirmation ? (
-                <div className="payment-pending-notice" role="status">
-                  <CheckCircle2 size={20} />
-                  <div>
-                    <strong>Payment details received</strong>
-                    <p>{paymentConfirmation}</p>
-                    <small>Your payment is pending seller verification. Keep your M-Pesa confirmation message.</small>
-                  </div>
-                </div>
-              ) : (
-                <form className="payment-submit-form" onSubmit={submitPaymentDetails}>
-                  <p className="pochi-instructions">
-                    After paying, enter the M-Pesa transaction code and the
-                    phone number you paid from.
-                  </p>
-                  {paymentError && (
-                    <div className="notice error-notice" role="alert">
-                      {paymentError}
-                    </div>
-                  )}
-                  <label>
-                    M-Pesa transaction code
-                    <input
-                      required
-                      minLength={8}
-                      maxLength={20}
-                      value={paymentTransactionCode}
-                      onChange={(event) => setPaymentTransactionCode(event.target.value.toUpperCase())}
-                      placeholder="e.g. QWE1234567"
-                      autoComplete="off"
-                    />
-                  </label>
-                  <label>
-                    Phone number used to pay
-                    <input
-                      required
-                      type="tel"
-                      inputMode="tel"
-                      value={paymentPayerPhone}
-                      onChange={(event) => setPaymentPayerPhone(event.target.value)}
-                      placeholder="e.g. 0712 345 678"
-                    />
-                  </label>
-                  <button
-                    className="primary-button full-button"
-                    type="submit"
-                    disabled={paymentSubmitting}
-                  >
-                    {paymentSubmitting ? (
-                      <><LoaderCircle className="spin" size={18} /> Submitting details...</>
-                    ) : (
-                      <>Submit payment details <ArrowRight size={18} /></>
-                    )}
-                  </button>
-                  <p className="secure-note">
-                    Submitting details does not confirm payment. The seller
-                    will check the transaction in Pochi before approving it.
-                  </p>
-                </form>
-              )}
+              <p className="secure-note">
+                After paying, send your M-Pesa confirmation message to us on
+                WhatsApp so we can confirm your order.
+              </p>
             </div>
 
             <button
@@ -1553,7 +1508,9 @@ function App() {
               onClick={() => openWhatsApp(whatsappOrderMessage)}
             >
               <MessageCircle size={19} />
-              Send order summary on WhatsApp
+              {whatsappSent
+                ? "Open WhatsApp again"
+                : "Send order summary on WhatsApp"}
             </button>
 
             {whatsappNotice && (

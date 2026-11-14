@@ -5,6 +5,7 @@ export type ProductCategory =
   | "strawberry"
   | "chocolate"
   | "ocool"
+  | "icecream"
   | "vanilla";
   
 

@@ -40,7 +40,7 @@ import "./App.css";
 /* Constants & helpers                                                 */
 /* ------------------------------------------------------------------ */
 
-const BUSINESS_NAME = "ALEX CANDY ENTERPRICE"; // change spelling here once
+const BUSINESS_NAME = "ALEX CANDY ENTERPRICE";
 const CART_STORAGE_KEY = "alex-candy-cart-v1";
 const LOW_STOCK_THRESHOLD = 5;
 const POCHI_PHONE = (
@@ -61,7 +61,7 @@ const categories: {
   { id: "chocolate", label: "Chocolate", emoji: "🍫" },
   { id: "strawberry", label: "Strawberry", emoji: "🍓" },
   { id: "ocool", label: "Ocool", emoji: "🍓" },
-   { id: "icecream", label: "icecream", emoji: "🍓" },
+  { id: "icecream", label: "Ice cream", emoji: "🍦" },
 ];
 
 const categoryEmoji = (productCategory: ProductCategory) =>
@@ -69,60 +69,97 @@ const categoryEmoji = (productCategory: ProductCategory) =>
     ? "\u{1F36C}"
     : productCategory === "yoghurt"
       ? "\u{1F95B}"
-      : "\u{1F367}";
-
+      : productCategory === "ice_pop"
+        ? "\u{1F367}"
+        : "\u{1F36D}";
 
 /**
- * LOCAL PRODUCT IMAGES
+ * Local images are used only when a product has no usable Django image,
+ * or when the Django image fails to load.
+ *
+ * IMPORTANT: filenames here must match the files in:
+ * frontend/public/products/
  */
-
 function getLocalProductImage(product: Product): string | null {
   const productName = product.name.trim().toLowerCase();
+  const productCategory = product.category;
 
-  // Strawberry products
-  if (productName.includes("strawberry")) {
+  if (productName.includes("strawberry") || productCategory === "strawberry") {
     return "/products/strawberry.jpeg";
   }
+
   if (productName.includes("icool")) {
     return "/products/icool.png";
   }
-  // Tropical products
-  if (productName.includes("tropicals")) {
+
+  if (productName.includes("tropical")) {
     return "/products/tropicals.jpeg";
   }
 
-  // O'Cool products
-  if (productName.includes("ocool")) {
+  if (productName.includes("ocool") || productCategory === "ocool") {
     return "/products/ocool.png";
   }
 
-  // Yoghurt products
-  if (product.category === "yoghurt") {
-    return "/products/youghurt.jpeg";
-  }
-
-  // Ice pop products
-  if (product.category === "ice_pop") {
-    return "/products/icepop.jpeg";
-  }
-
-  // Chocolate products
   if (
     productName.includes("chocolate") ||
-    productName.includes("duos")
+    productName.includes("duos") ||
+    productCategory === "chocolate"
   ) {
     return "/products/chocolate.jpeg";
   }
 
-  // Other candy products
-  if (product.category === "candy") {
+  if (
+    productName.includes("ice cream") ||
+    productName.includes("icecream") ||
+    productCategory === "icecream" ||
+    productCategory === "vanilla"
+  ) {
+    return "/products/icecream.png";
+  }
+
+  if (productCategory === "yoghurt") {
+    return "/products/youghurt.jpeg";
+  }
+
+  if (productCategory === "ice_pop") {
+    return "/products/icepop.jpeg";
+  }
+
+  if (productCategory === "candy") {
     return "/products/sweets.png";
   }
 
-  // Fallback to the image supplied by Django
-  return getProductImage(product.image) || null;
+  return null;
 }
 
+/**
+ * Selects the image to show based on its loading stage:
+ * 0 = Django image (or local image if Django has no image)
+ * 1 = local fallback after the Django image fails
+ * 2 = no image; show the category emoji
+ */
+function getDisplayedProductImage(
+  product: Product,
+  failedStage: number,
+): string | null {
+  const djangoImage = getProductImage(product.image);
+  const localImage = getLocalProductImage(product);
+
+  if (failedStage === 0) {
+    return djangoImage || localImage;
+  }
+
+  if (
+    failedStage === 1 &&
+    djangoImage &&
+    localImage &&
+    djangoImage !== localImage
+  ) {
+    return localImage;
+  }
+
+  return null;
+}
 
 const moneyFormatter = new Intl.NumberFormat("en-KE", {
   style: "currency",
@@ -237,7 +274,10 @@ function App() {
   const [copied, setCopied] = useState(false);
   const [toast, setToast] = useState("");
   const [activeSection, setActiveSection] = useState("home");
-  const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
+
+  // 0 = primary image, 1 = local fallback, 2 = both images failed.
+  const [failedImages, setFailedImages] = useState<Record<number, number>>({});
+
   const [customer, setCustomer] = useState<CustomerForm>(emptyCustomer);
   const [phoneTouched, setPhoneTouched] = useState(false);
 
@@ -554,9 +594,8 @@ function App() {
       return;
     }
 
-    // Open the WhatsApp tab right now, while we are still inside the customer's
-    // click. Browsers block pop-ups that open after a network request finishes.
-    // We point it at the order summary as soon as the order is saved.
+    // Open the WhatsApp tab now, while still inside the customer's click.
+    // Browsers may block a new tab opened after the network request completes.
     const waWindow = whatsappNumber ? window.open("", "_blank") : null;
     if (waWindow) {
       try {
@@ -645,13 +684,14 @@ function App() {
         );
       }
 
-      // Next step: mode of payment
+      // Show the next step: payment.
       setWhatsappOrderMessage(summary);
       setWhatsappSent(sentToWhatsApp);
       setSuccessOrder(order);
       setCart([]);
       setCheckoutOpen(false);
       setCartOpen(false);
+
       // Keep name/phone for next time, clear the one-off fields.
       setCustomer((current) => ({
         ...current,
@@ -808,256 +848,258 @@ function App() {
 
       <main>
         <div className="store-stage">
-        {/* ---------------- Store top: search + categories ---------------- */}
-        <section className="store-top" id="home">
-          <div className="store-top-inner">
-            <span className="store-eyebrow">
-              <Sparkles size={14} /> Welcome to {BUSINESS_NAME}
-            </span>
+          {/* ---------------- Store top: search + categories ---------------- */}
+          <section className="store-top" id="home">
+            <div className="store-top-inner">
+              <span className="store-eyebrow">
+                <Sparkles size={14} /> Welcome to {BUSINESS_NAME}
+              </span>
 
-            <h1>
-              Sweet treats, <span>one click away.</span>
-            </h1>
+              <h1>
+                Sweet treats, <span>one click away.</span>
+              </h1>
 
-            <p>
-              Pick your favourites, add them to your cart and place your order
-              in minutes.
-            </p>
+              <p>
+                Pick your favourites, add them to your cart and place your order
+                in minutes.
+              </p>
 
-            <form
-              className="store-search"
-              role="search"
-              onSubmit={(event) => event.preventDefault()}
-            >
-              <Search size={20} />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search all candy..."
-                aria-label="Search products"
-              />
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => setSearch("")}
-                  aria-label="Clear search"
-                >
-                  <X size={18} />
-                </button>
-              )}
-            </form>
-
-            <div className="pill-row" aria-label="Filter products by category">
-              {categories.map((item) => {
-                const selected = category === item.id;
-                return (
+              <form
+                className="store-search"
+                role="search"
+                onSubmit={(event) => event.preventDefault()}
+              >
+                <Search size={20} />
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search all candy..."
+                  aria-label="Search products"
+                />
+                {search && (
                   <button
-                    key={item.id}
                     type="button"
-                    className={`pill ${selected ? "selected" : ""}`}
-                    aria-pressed={selected}
-                    onClick={() => setCategory(item.id)}
+                    onClick={() => setSearch("")}
+                    aria-label="Clear search"
                   >
-                    {selected && item.id !== "all" && <X size={13} />}
-                    {item.label} ({categoryCounts[item.id] ?? 0})
+                    <X size={18} />
                   </button>
-                );
-              })}
-            </div>
+                )}
+              </form>
 
-            <button
-              type="button"
-              className="store-help"
-              onClick={contactOnWhatsApp}
-            >
-              <MessageCircle size={16} />
-              Questions? Chat with us on WhatsApp
-            </button>
-          </div>
-        </section>
-
-        {/* ---------------- Products ---------------- */}
-        <section className="products-section" id="products">
-          {loading ? (
-            <div
-              className="product-grid"
-              aria-busy="true"
-              aria-label="Loading products"
-            >
-              {Array.from({ length: 6 }).map((_, index) => (
-                <div className="product-card skeleton-card" key={index}>
-                  <div className="skeleton skeleton-image" />
-                  <div className="skeleton skeleton-line" />
-                  <div className="skeleton skeleton-line short" />
-                </div>
-              ))}
-            </div>
-          ) : loadError && products.length === 0 ? (
-            <div className="state-message" role="alert">
-              <span className="state-emoji">{"\u{1F36D}"}</span>
-              <h3>Our sweet shelf is taking a break</h3>
-              <p>{loadError}</p>
-              <button
-                className="primary-button"
-                onClick={() => void loadProducts()}
+              <div
+                className="pill-row"
+                aria-label="Filter products by category"
               >
-                Try again
+                {categories.map((item) => {
+                  const selected = category === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`pill ${selected ? "selected" : ""}`}
+                      aria-pressed={selected}
+                      onClick={() => setCategory(item.id)}
+                    >
+                      {selected && item.id !== "all" && <X size={13} />}
+                      {item.label} ({categoryCounts[item.id] ?? 0})
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                className="store-help"
+                onClick={contactOnWhatsApp}
+              >
+                <MessageCircle size={16} />
+                Questions? Chat with us on WhatsApp
               </button>
             </div>
-          ) : filteredProducts.length === 0 ? (
-            <div className="state-message">
-              <span className="state-emoji">{"\u{1F36C}"}</span>
-              <h3>No products found just yet</h3>
-              <p>Try another search or choose a different category.</p>
-              <button
-                className="secondary-button"
-                onClick={() => {
-                  setSearch("");
-                  setCategory("all");
-                }}
+          </section>
+
+          {/* ---------------- Products ---------------- */}
+          <section className="products-section" id="products">
+            {loading ? (
+              <div
+                className="product-grid"
+                aria-busy="true"
+                aria-label="Loading products"
               >
-                Show all products
-              </button>
-            </div>
-          ) : (
-            <div className="product-grid">
-              {filteredProducts.map((product, index) => {
-                const imageUrl = getLocalProductImage(product);
-                const inCart = quantityInCart.get(product.id) ?? 0;
-                const soldOut = product.stock_quantity < 1;
-                const maxedOut = inCart >= product.stock_quantity;
-                const lowStock =
-                  !soldOut && product.stock_quantity <= LOW_STOCK_THRESHOLD;
+                {Array.from({ length: 6 }).map((_, index) => (
+                  <div className="product-card skeleton-card" key={index}>
+                    <div className="skeleton skeleton-image" />
+                    <div className="skeleton skeleton-line" />
+                    <div className="skeleton skeleton-line short" />
+                  </div>
+                ))}
+              </div>
+            ) : loadError && products.length === 0 ? (
+              <div className="state-message" role="alert">
+                <span className="state-emoji">{"\u{1F36D}"}</span>
+                <h3>Our sweet shelf is taking a break</h3>
+                <p>{loadError}</p>
+                <button
+                  className="primary-button"
+                  onClick={() => void loadProducts()}
+                >
+                  Try again
+                </button>
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="state-message">
+                <span className="state-emoji">{"\u{1F36C}"}</span>
+                <h3>No products found just yet</h3>
+                <p>Try another search or choose a different category.</p>
+                <button
+                  className="secondary-button"
+                  onClick={() => {
+                    setSearch("");
+                    setCategory("all");
+                  }}
+                >
+                  Show all products
+                </button>
+              </div>
+            ) : (
+              <div className="product-grid">
+                {filteredProducts.map((product, index) => {
+                  const imageStage = failedImages[product.id] ?? 0;
+                  const imageUrl = getDisplayedProductImage(
+                    product,
+                    imageStage
+                  );
+                  const inCart = quantityInCart.get(product.id) ?? 0;
+                  const soldOut = product.stock_quantity < 1;
+                  const maxedOut = inCart >= product.stock_quantity;
+                  const lowStock =
+                    !soldOut && product.stock_quantity <= LOW_STOCK_THRESHOLD;
 
-                return (
-                  <article
-                    className={`product-card product-card-${index % 4} ${
-                      soldOut ? "is-sold-out" : ""
-                    }`}
-                    key={product.id}
-                  >
-                    <div className="product-image">
-                      {imageUrl ? (
-                        <img
-                          src={imageUrl}
-                          alt={product.name}
-                          loading="lazy"
-                          decoding="async"
-                          onError={() =>
-                            setFailedImages((current) => ({
-                              ...current,
-                              [product.id]: true,
-                            }))
-                          }
-                        />
-                      ) : (
-                        <img
-                          src={
-                            product.category === "yoghurt"
-                              ? "/products/youghurt.jpeg"
-                              : product.category === "ice_pop"
-                                ? "/products/icepop.jpeg"
-                                : "/products/sweets.jpeg"
-                          }
-                          alt={product.name}
-                          loading="lazy"
-                          decoding="async"
-                        />
-                      )}
-                      {soldOut && (
-                        <span className="stock-badge sold-out">Sold out</span>
-                      )}
-                      {lowStock && (
-                        <span className="stock-badge low">
-                          Only {product.stock_quantity} left
-                        </span>
-                      )}
-                    </div>
+                  return (
+                    <article
+                      className={`product-card product-card-${index % 4} ${
+                        soldOut ? "is-sold-out" : ""
+                      }`}
+                      key={product.id}
+                    >
+                      <div className="product-image">
+                        {imageUrl ? (
+                          <img
+                            src={imageUrl}
+                            alt={product.name}
+                            loading="lazy"
+                            decoding="async"
+                            onError={() =>
+                              setFailedImages((current) => ({
+                                ...current,
+                                [product.id]: Math.min(
+                                  (current[product.id] ?? 0) + 1,
+                                  2
+                                ),
+                              }))
+                            }
+                          />
+                        ) : (
+                          <span className="product-emoji">
+                            {categoryEmoji(product.category)}
+                          </span>
+                        )}
 
-                    <div className="product-details">
-                      <h3>{product.name}</h3>
-                      <p>
-                        {product.description ||
-                          "A little treat to brighten your day."}
-                      </p>
-                      <div className="product-bottom">
-                        <div>
-                          <strong className="product-price">
-                            {money(product.price)}
-                          </strong>
-                          <small>
-                            {soldOut
-                              ? "Currently sold out"
-                              : inCart > 0
-                                ? `${inCart} in your cart`
-                                : `${product.stock_quantity} available`}
-                          </small>
-                        </div>
-
-                        {inCart > 0 && !soldOut && (
-                          <div className="quantity-control card-qty">
-                            <button
-                              onClick={() => updateQuantity(product.id, -1)}
-                              aria-label={`Decrease ${product.name} quantity`}
-                            >
-                              <Minus size={14} />
-                            </button>
-                            <span aria-live="polite">{inCart}</span>
-                            <button
-                              onClick={() => updateQuantity(product.id, 1)}
-                              disabled={maxedOut}
-                              aria-label={`Increase ${product.name} quantity`}
-                            >
-                              <Plus size={14} />
-                            </button>
-                          </div>
+                        {soldOut && (
+                          <span className="stock-badge sold-out">Sold out</span>
+                        )}
+                        {lowStock && (
+                          <span className="stock-badge low">
+                            Only {product.stock_quantity} left
+                          </span>
                         )}
                       </div>
 
-                      <button
-                        className="add-button"
-                        onClick={() => addToCart(product)}
-                        disabled={soldOut || maxedOut}
-                        aria-label={`Add ${product.name} to cart`}
-                      >
-                        {soldOut ? (
-                          "Sold out"
-                        ) : maxedOut ? (
-                          "All in your cart"
-                        ) : (
-                          <>
-                            <Plus size={16} /> Add to cart
-                          </>
-                        )}
-                      </button>
+                      <div className="product-details">
+                        <h3>{product.name}</h3>
+                        <p>
+                          {product.description ||
+                            "A little treat to brighten your day."}
+                        </p>
+                        <div className="product-bottom">
+                          <div>
+                            <strong className="product-price">
+                              {money(product.price)}
+                            </strong>
+                            <small>
+                              {soldOut
+                                ? "Currently sold out"
+                                : inCart > 0
+                                  ? `${inCart} in your cart`
+                                  : `${product.stock_quantity} available`}
+                            </small>
+                          </div>
 
-                      <button
-                        className="product-whatsapp-button"
-                        onClick={() => orderProductDirectly(product)}
-                        disabled={soldOut}
-                      >
-                        <MessageCircle size={15} />
-                        Order direct on WhatsApp
-                      </button>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
+                          {inCart > 0 && !soldOut && (
+                            <div className="quantity-control card-qty">
+                              <button
+                                onClick={() => updateQuantity(product.id, -1)}
+                                aria-label={`Decrease ${product.name} quantity`}
+                              >
+                                <Minus size={14} />
+                              </button>
+                              <span aria-live="polite">{inCart}</span>
+                              <button
+                                onClick={() => updateQuantity(product.id, 1)}
+                                disabled={maxedOut}
+                                aria-label={`Increase ${product.name} quantity`}
+                              >
+                                <Plus size={14} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
 
-          {whatsappNotice && !successOrder && (
-            <div className="notice error-notice" role="alert">
-              {whatsappNotice}
-              <button
-                onClick={() => setWhatsappNotice("")}
-                aria-label="Dismiss message"
-              >
-                <X size={16} />
-              </button>
-            </div>
-          )}
-        </section>
+                        <button
+                          className="add-button"
+                          onClick={() => addToCart(product)}
+                          disabled={soldOut || maxedOut}
+                          aria-label={`Add ${product.name} to cart`}
+                        >
+                          {soldOut ? (
+                            "Sold out"
+                          ) : maxedOut ? (
+                            "All in your cart"
+                          ) : (
+                            <>
+                              <Plus size={16} /> Add to cart
+                            </>
+                          )}
+                        </button>
+
+                        <button
+                          className="product-whatsapp-button"
+                          onClick={() => orderProductDirectly(product)}
+                          disabled={soldOut}
+                        >
+                          <MessageCircle size={15} />
+                          Order direct on WhatsApp
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+
+            {whatsappNotice && !successOrder && (
+              <div className="notice error-notice" role="alert">
+                {whatsappNotice}
+                <button
+                  onClick={() => setWhatsappNotice("")}
+                  aria-label="Dismiss message"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
+          </section>
         </div>
 
         <OrderTracking />
@@ -1090,7 +1132,16 @@ function App() {
           </span>
         </a>
 
-  <p> Site by <a href="https://sajims-company.vercel.app/" target="_blank" rel="noopener noreferrer">Sajims company</a></p>
+        <p>
+          Site by{" "}
+          <a
+            href="https://sajims-company.vercel.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Sajims company
+          </a>
+        </p>
         <span>
           {"\u00A9"} {new Date().getFullYear()} {BUSINESS_NAME}
         </span>
@@ -1126,7 +1177,6 @@ function App() {
 
             {cart.length === 0 ? (
               <div className="empty-cart">
-               
                 <h3>Your cart is waiting for products!</h3>
                 <p>Add some goodies and they&apos;ll appear here.</p>
                 <button
@@ -1140,11 +1190,16 @@ function App() {
               <>
                 <div className="cart-items">
                   {cart.map((item) => {
-                    const imageUrl = getLocalProductImage(item.product);
+                    const imageStage = failedImages[item.product.id] ?? 0;
+                    const imageUrl = getDisplayedProductImage(
+                      item.product,
+                      imageStage
+                    );
+
                     return (
                       <div className="cart-item" key={item.product.id}>
                         <div className="cart-item-emoji">
-                          {imageUrl && !failedImages[item.product.id] ? (
+                          {imageUrl ? (
                             <img
                               className="cart-item-image"
                               src={imageUrl}
@@ -1153,7 +1208,10 @@ function App() {
                               onError={() =>
                                 setFailedImages((current) => ({
                                   ...current,
-                                  [item.product.id]: true,
+                                  [item.product.id]: Math.min(
+                                    (current[item.product.id] ?? 0) + 1,
+                                    2
+                                  ),
                                 }))
                               }
                             />

@@ -35,11 +35,11 @@ const categories: {
   label: string;
   emoji: string;
 }[] = [
-  { id: "all", label: "All products", emoji: "🍬" },
-  { id: "candy", label: "Candies", emoji: "🍭" },
-  { id: "yoghurt", label: "Yoghurt", emoji: "🥛" },
-  { id: "ice_pop", label: "Ice pops", emoji: "🍧" },
-  { id: "chocolate", label: "Chocolate", emoji:"🍭"},
+  { id: "all", label: "All products", emoji: "" },
+  { id: "candy", label: "Candies", emoji: "" },
+  { id: "yoghurt", label: "Yoghurt", emoji: " " },
+  { id: "ice_pop", label: "Ice pops", emoji: "" },
+  { id: "chocolate", label: "Chocolate", emoji:""},
 ];
 
 const money = (amount: string | number) =>

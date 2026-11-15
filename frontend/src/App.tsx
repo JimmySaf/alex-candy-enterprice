@@ -1115,7 +1115,7 @@ function App() {
         <OrderTracking />
 
         <section className="bottom-banner">
-          <div className="banner-emoji">{"\u{1F36D}"}</div>
+          <div className="banner-emoji">{""}</div>
           <div>
             <span className="eyebrow">A LITTLE TREAT, A LOT OF JOY</span>
             <h2>Ready to make today sweeter?</h2>

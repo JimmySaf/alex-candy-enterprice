@@ -190,13 +190,13 @@ function App() {
 
   function contactOnWhatsApp() {
     openWhatsApp(
-      "Hello ALEX CANDY ENTERPRICE! I'd like to ask about your products."
+      "Hello ALEX CANDY enterprise! I'd like to ask about your products."
     );
   }
 
   function orderProductDirectly(product: Product) {
     const message = [
-      "Hello ALEX CANDY ENTERPRICE!",
+      "Hello ALEX CANDY enterprise!",
       "",
       "I'd like to order this product directly:",
       `Product: ${product.name}`,
@@ -250,7 +250,7 @@ function App() {
       const order = response.data;
 
       const messageLines = [
-        "Hello ALEX CANDY ENTERPRICE! 🍬",
+        "Hello ALEX CANDY enterprise! 🍬",
         "",
         "I'd like to follow up on my online order.",
         `Order number: ${order.order_number}`,
@@ -365,7 +365,7 @@ function App() {
           </span>
           <span className="brand-copy">
             <strong>ALEX CANDY</strong>
-            <small>ENTERPRICE · SWEETNESS FOR EVERYONE</small>
+            <small>enterprise · SWEETNESS FOR EVERYONE</small>
           </span>
         </a>
 
@@ -634,11 +634,11 @@ function App() {
           </span>
           <span className="brand-copy">
             <strong>ALEX CANDY</strong>
-            <small>ENTERPRICE</small>
+            <small>enterprise</small>
           </span>
         </a>
         <p>Making everyday moments a little sweeter. 💗</p>
-        <span>© {new Date().getFullYear()} ALEX CANDY ENTERPRICE</span>
+        <span>© {new Date().getFullYear()} ALEX CANDY enterprise</span>
       </footer>
 
       {cartOpen && (

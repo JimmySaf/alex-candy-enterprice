@@ -1,4 +1,4 @@
-# ALEX CANDY ENTERPRICE — frontend fixes
+# ALEX CANDY enterprise — frontend fixes
 
 Replace the matching files in `frontend/src/` with the files in this ZIP:
 - `App.tsx`

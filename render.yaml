@@ -1,7 +1,7 @@
 
 services:
   - type: web
-    name: alexcandyenterprice
+    name: alexcandyenterprise
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile
@@ -18,7 +18,7 @@ services:
         value: ".onrender.com"
 
       - key: CSRF_TRUSTED_ORIGINS
-        value: "https://alexcandyenterprice.onrender.com"
+        value: "https://alexcandyenterprise.onrender.com"
 
       - key: VITE_API_BASE_URL
         value: "/api"

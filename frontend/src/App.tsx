@@ -40,7 +40,7 @@ import "./App.css";
 /* Constants & helpers                                                 */
 /* ------------------------------------------------------------------ */
 
-const BUSINESS_NAME = "ALEX CANDY ENTERPRICE";
+const BUSINESS_NAME = "ALEX CANDY enterprise";
 const CART_STORAGE_KEY = "alex-candy-cart-v1";
 const LOW_STOCK_THRESHOLD = 5;
 const POCHI_PHONE = (
@@ -62,6 +62,8 @@ const categories: {
   { id: "strawberry", label: "Strawberry", emoji: "🍓" },
   { id: "ocool", label: "Ocool", emoji: "🍓" },
   { id: "icecream", label: "Ice cream", emoji: "🍦" },
+  { id: "sunita", label: "Sunita", emoji: "🍦" },
+
 ];
 
 const categoryEmoji = (productCategory: ProductCategory) =>
@@ -77,7 +79,7 @@ const categoryEmoji = (productCategory: ProductCategory) =>
  * Local images are used only when a product has no usable Django image,
  * or when the Django image fails to load.
  *
- * IMPORTANT: filenames here must match the files in:
+ 
  * frontend/public/products/
  */
 function getLocalProductImage(product: Product): string | null {
@@ -90,6 +92,14 @@ function getLocalProductImage(product: Product): string | null {
 
   if (productName.includes("icool")) {
     return "/products/icool.png";
+  }
+
+  if (productName.includes("sunita")) {
+    return "/products/sunita.png";
+  }
+
+   if (productName.includes("cadbury")) {
+    return "/products/cadbury.png";
   }
 
   if (productName.includes("tropical")) {
@@ -763,7 +773,7 @@ function App() {
           </span>
           <span className="brand-copy">
             <strong>ALEX CANDY</strong>
-            <small>ENTERPRICE {"\u00B7"} SWEETNESS FOR EVERYONE</small>
+            <small>enterprise {"\u00B7"} SWEETNESS FOR EVERYONE</small>
           </span>
         </a>
 
@@ -1128,7 +1138,7 @@ function App() {
           </span>
           <span className="brand-copy">
             <strong>ALEX CANDY</strong>
-            <small>ENTERPRICE</small>
+            <small>enterprise</small>
           </span>
         </a>
 
@@ -1617,5 +1627,4 @@ function App() {
     </div>
   );
 }
-
 export default App;

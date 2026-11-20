@@ -1142,16 +1142,21 @@ function App() {
           </span>
         </a>
 
-        <p>
-          Site by{" "}
-          <a
-            href="https://sajims-company.vercel.app/"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Sajims company
-          </a>
-        </p>
+        
+<p className="site-credit">
+  Site proudly designed by{" "}
+  <a
+    href="https://sajims-company.vercel.app/"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="site-credit-link"
+    aria-label="Visit Sajims Company website"
+  >
+    Sajims Company
+    <span aria-hidden="true"> ↗</span>
+  </a>
+</p>
+
         <span>
           {"\u00A9"} {new Date().getFullYear()} {BUSINESS_NAME}
         </span>

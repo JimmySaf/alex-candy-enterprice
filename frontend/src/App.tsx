@@ -1144,7 +1144,7 @@ function App() {
 
         
 <p className="site-credit">
-  Site proudly designed by{" "}
+  Site designed by{" "}
   <a
     href="https://sajims-company.vercel.app/"
     target="_blank"
